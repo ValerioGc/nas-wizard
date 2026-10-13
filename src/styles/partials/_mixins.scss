@@ -1,0 +1,20 @@
+@use './variables' as *;
+
+@mixin focus-ring {
+  outline: $focus_width solid $color_primary;
+  outline-offset: $focus_offset;
+}
+
+@mixin spinning($duration: $duration_spin) {
+  animation: spinning $duration linear infinite;
+
+  @keyframes spinning {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

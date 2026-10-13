@@ -1,0 +1,51 @@
+# The browser on the monitor connected to the NAS: cog, which draws the page straight on the
+# screen through DRM/KMS, with no display server. nas-os-screen.service starts it while a monitor is
+# connected and touched, and stops it when the monitor goes, into standby or when another console
+# comes in front (Ctrl+Alt+F2 to F6 reach the text login). It runs as nas-screen in a session of its
+# own on tty1, which gives it the screen, the keyboard and the mouse, and keeps its data in its
+# runtime directory: whatever it signed in with is gone when it stops. Whenever it stops, for
+# whatever reason, the text login comes back on tty1; it never restarts on its own, and it stops
+# with nas-os-screen.service.
+
+[Unit]
+Description=nas-os screen browser
+Documentation=https://github.com/ValerioGc/nas-wizard
+ConditionPathExists=/dev/tty1
+Wants=dbus.socket systemd-logind.service
+After=dbus.socket systemd-logind.service systemd-user-sessions.service getty@tty1.service
+Conflicts=getty@tty1.service
+PartOf=nas-os-screen.service
+
+[Service]
+Type=simple
+User=nas-screen
+PAMName=nas-os-screen
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+RuntimeDirectory=nas-os-screen
+RuntimeDirectoryMode=0700
+Environment=HOME=/run/nas-os-screen XDG_CONFIG_HOME=/run/nas-os-screen XDG_DATA_HOME=/run/nas-os-screen XDG_CACHE_HOME=/run/nas-os-screen
+# The wizard before the first configuration, the gateway after it: whoever answers on the port of
+# the screen, which the base firewall opens to this user only. cog opens it straight away, once it
+# answers: moving from a local page to it makes cog crash.
+ExecStartPre=/bin/bash -c 'until (exec 3<>/dev/tcp/127.0.0.1/8081) 2>/dev/null; do sleep 1; done'
+TimeoutStartSec=5min
+ExecStart=/usr/bin/cog --platform=drm http://127.0.0.1:8081/
+ExecStopPost=-+/usr/bin/systemctl --no-block start getty@tty1.service
+# cog crashes on its way out after SIGTERM: stopped at once, and a stop asked for ends clean.
+KillSignal=SIGKILL
+SuccessExitStatus=SIGKILL
+NoNewPrivileges=yes
+ProtectSystem=strict
+# WebKit keeps its sandbox in the runtime directory of the session, /run/user/<uid>, which
+# ProtectHome= would hide: home and root are hidden one by one instead.
+ReadWritePaths=-/run/user
+InaccessiblePaths=-/home -/root
+PrivateTmp=yes

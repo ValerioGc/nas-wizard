@@ -1,0 +1,5 @@
+# The session of the browser on the monitor of the NAS (nas-os-screen-browser.service): no password,
+# which the user it runs as does not have, and a logind session, which gives it the seat.
+account  required  pam_unix.so
+session  required  pam_unix.so
+session  required  pam_systemd.so

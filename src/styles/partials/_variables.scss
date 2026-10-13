@@ -1,0 +1,43 @@
+$color_primary: #258ac0;
+$color_primary_hover: #1d719e;
+$color_on_primary: #ffffff;
+
+// Login layout and shared UI primitives.
+$font_ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+$space_2: 0.5rem;
+$space_3: 0.75rem;
+$space_4: 1rem;
+$space_5: 1.25rem;
+$space_6: 1.5rem;
+$space_8: 2rem;
+$space_10: 2.5rem;
+$text_label: 0.875rem;
+$text_base: 1rem;
+$text_large: 1.125rem;
+$radius_control: 0.625rem;
+$radius_large: 1.25rem;
+$border_thin: 1px;
+$focus_width: 2px;
+$focus_offset: 3px;
+$duration_fast: 150ms;
+$duration_spin: 800ms;
+
+// Scrollbars ***************************
+$scrollbar_size: 0.625rem;
+
+// Spinner ***************************
+$spinner_large: 2.5rem;
+$spinner_stroke: 0.15em;
+
+// Icons ***************************
+$icon_small: 1rem;
+$icon_medium: 1.25rem;
+$icon_large: 1.5rem;
+
+// Dropdowns and modals ***************************
+$duration_pop: 140ms;
+
+$wizard_width: 36rem;
+$wizard_logo_size: 4.5rem;
+$wizard_height: 38rem;
+$preview_height: 10rem;

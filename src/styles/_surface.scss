@@ -1,0 +1,117 @@
+@use '@/styles/global' as *;
+
+// Namespaced once: native apps and modal content share controls without styling the shell.
+.app_surface {
+  color: var(--theme-foreground);
+  font: #{$text_base}/ 1.5 $font_ui;
+  min-width: 0;
+
+  h1,
+  h2 {
+    font-size: $text_large;
+    font-weight: 650;
+  }
+
+  h3 {
+    font-size: $text_base;
+  }
+
+  button {
+    @extend %button;
+  }
+
+  input:not([type='checkbox']):not([type='range']):not([type='color']),
+  select,
+  textarea {
+    @extend %control;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  input[type='checkbox'],
+  input[type='range'] {
+    accent-color: var(--accent);
+  }
+
+  input[type='range'] {
+    width: 100%;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: $preview_height;
+  }
+
+  label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space_2;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: $text_label;
+  }
+
+  th,
+  td {
+    padding: $space_3;
+    border-bottom: $border_thin solid var(--surface-border);
+    white-space: nowrap;
+  }
+
+  th {
+    font-weight: 650;
+    background: var(--surface-sunken);
+  }
+
+  tr:hover td {
+    background: var(--surface-hover);
+  }
+
+  button[aria-pressed='true'],
+  button[aria-selected='true'] {
+    background: var(--surface-hover);
+    border-color: var(--accent);
+  }
+
+  img {
+    object-fit: contain;
+  }
+
+  .primary {
+    background: $color_primary;
+    color: $color_on_primary;
+
+    &:hover:not(:disabled) {
+      background: $color_primary_hover;
+    }
+  }
+
+  .app_error {
+    color: var(--status-error);
+  }
+
+  .muted {
+    @extend %muted;
+  }
+
+  .app_toolbar {
+    @extend %fx_base;
+    flex-wrap: wrap;
+    gap: $space_2;
+  }
+
+  .app_panel {
+    @extend %panel;
+    padding: $space_4;
+  }
+
+  .app_list {
+    @extend %stack;
+    gap: $space_2;
+  }
+}

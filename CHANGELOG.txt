@@ -1,0 +1,91 @@
+# Changelog
+
+All notable changes to the wizard of nas-os are documented in this file.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
+uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Changed
+
+- The texts of the interface, in Italian and English, are impersonal and shorter: no ellipsis,
+  colon or semicolon, no names of commands or services. The messages of the entry script at its
+  end say where the configuration page is without telling to open it.
+- The configuration of the system removes cron as well: on Debian 13 the timers of systemd do its
+  work, and nas-os does not use it. It stays when a user has a crontab or a job in `/etc/cron.*`
+  was not installed by a package. ModemManager, BlueZ and cron are weighed one by one: one a
+  desktop needs no longer keeps the others, and a purge apt cannot simulate keeps the package.
+
+### Added
+
+- The release package leaves in `release-assets/` only the version just built and the one before
+  it (`scripts/release/prune_assets.mjs`): older packages, installation manuals and the user
+  manuals left from before the split of the projects go.
+- An IPv4 responder for NAS Finder: it answers a query of the local network on UDP 39877 with the
+  name of the machine, whether it still has to be set up and the port of its page, at most ten
+  replies a second, never an account, a session or the machine identity (only a digest of it). The
+  base firewall has the set `nas_discovery`, empty by default, whose port is open only to the
+  private and link-local IPv4 addresses: the wizard puts UDP 39877 in it while it answers, and
+  empties it when it stops, before it hands the port over to the gateway. From then on the
+  launcher puts it back only while the option of the security center is on.
+- The base firewall has a set of ports `nas_shares`, open only to the private and link-local
+  addresses: empty, so closed, until the launcher puts TCP 445 in it while a folder is shared on
+  the local network, and empties it when none is.
+- The base firewall has the sets of the sync: `nas_sync`, ports open only to the private and
+  link-local addresses, empty until the launcher puts the ports of Syncthing in it (TCP and UDP
+  22000, UDP 21027) while a sync is on; and `nas_apps_sync`, the cgroups of the application of the
+  sync, which may reach only the local network on those ports, the broadcast and the multicast of
+  the local discovery.
+
+- At the end of the installation, once the launcher is installed and configured,
+  `post_wizard/clean-package.sh` puts the installation manual and the user manual in the home of
+  the user of the terminal, empties the unpacked package but for `uninstall.sh`, and removes the
+  archive beside it and a newer wizard downloaded by the entry script. The entry script installs
+  `os_configuration` with the wizard, and `uninstall.sh`, left alone, takes it from there and
+  removes the wizard last.
+
+- The configuration of the system installs its packages without what they recommend (adding
+  wpasupplicant and wireless-regdb for the wireless cards), purges ModemManager and BlueZ when
+  nothing else goes with them, and ends with `apt-get autoremove --purge` and `apt-get clean`.
+- `scripts/wifi.sh`: wpa_supplicant only on a machine with a wireless card, checked at every boot
+  by `nas-os-wifi.service` and at once by udev when a card appears.
+
+- The screen of the NAS: on a machine with a video output the configuration of the system installs
+  cog, the user nas-screen and two units. `nas-wizard screen` starts the browser only while a monitor
+  is connected, and puts the screen in standby after the minutes unused of the power settings;
+  the wizard answers on the port of the screen (`WIZARD_SCREEN_PORT`), which the base firewall
+  opens to nas-screen only. The browser runs only while tty1 is the console in front, so
+  Ctrl+Alt+F2 to F6 always reach the text login.
+
+- `install.sh --update`, run by the launcher when it updates the NAS and before its factory reset:
+  the configuration of the operating system again (the base firewall opens SMTP to the
+  applications granted `network:smtp`), and the new wizard in place, neither searched nor started.
+
+- The name of the NAS, chosen with language and theme (`nas` until changed): the launcher saves it
+  and makes it the hostname. The wizard needs a launcher from 0.1.23 and a gateway from 0.1.9.
+
+- A project of its own, and the only package the user downloads
+  (`nas-wizard-<version>-linux-x64.tar.gz`): the entry script, the configuration of the operating
+  system, the wizard and the two manuals.
+- The entry script configures Debian, looks for a newer wizard, installs it in
+  `/usr/local/lib/nas-wizard` and starts it as the unit `nas-wizard` on port 80. It asks nothing:
+  the token is given in the wizard.
+- The unit stays on the machine, disabled after the handover, so the factory reset of the launcher
+  can start the wizard again.
+- The wizard downloads the latest gateway and launcher with the token, installs and configures
+  them, creates the account and hands port 80 over to the gateway.
+
+### Fixed
+
+- The configuration of the operating system waits for the lock of dpkg, which `apt-daily` often
+  holds at the first boot of a Debian just installed, instead of failing at once.
+- The actions stay at the foot of every step instead of following its content, the fields of the
+  name, language and theme step keep the spacing of the account step, and the end of the
+  installation brings the HTTPS authority and its button into view, or the button that retries.
+
+### Removed
+
+- Unused development dependencies: `@vitest/eslint-plugin`, `@vue/eslint-config-typescript`
+  and `eslint-config-prettier`.
+
