@@ -1,6 +1,6 @@
 {
   "name": "nas-wizard",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "private": true,
   "type": "module",
   "description": "Wizard of NAS OS: configures Debian, then installs and configures the gateway and the launcher",
