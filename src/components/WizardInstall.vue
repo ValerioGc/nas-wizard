@@ -5,13 +5,12 @@ import { t } from '@/i18n';
 import { request } from '@/api/client';
 import { usePolling } from '@/composables/usePolling';
 import { failureMessage } from '@/utils/failureMessage';
-import type { InstallStep, StepId, WizardState } from '@/types/types';
+import type { StepId, WizardState } from '@/types/types';
 
 import CommonIcon from '@/components/commons/CommonIcon.vue';
 import CommonSpinner from '@/components/commons/CommonSpinner.vue';
 import WizardCertificate from '@/components/WizardCertificate.vue';
 import errorIcon from '@/assets/icons/status/error.svg';
-import loadingIcon from '@/assets/icons/status/loading.svg';
 import successIcon from '@/assets/icons/status/success.svg';
 
 interface Props {
@@ -27,18 +26,17 @@ const LABELS: Record<StepId, string> = {
   install_gateway: 'stepInstallGateway',
   install_ui: 'stepInstallUi',
   configure: 'stepConfigure',
+  disks: 'stepDisks',
   account: 'stepAccount',
   certificate: 'stepCertificate',
   complete: 'stepComplete',
   handover: 'stepHandover',
 };
-const ICONS: Record<Exclude<InstallStep['state'], 'running'>, string> = {
-  pending: loadingIcon,
+const ICONS: Record<'done' | 'failed', string> = {
   done: successIcon,
   failed: errorIcon,
 };
-const STATES: Record<Exclude<InstallStep['state'], 'running'>, string> = {
-  pending: 'stepPending',
+const STATES: Record<'done' | 'failed', string> = {
   done: 'stepDone',
   failed: 'stepFailed',
 };
@@ -47,6 +45,12 @@ const state = ref<WizardState>(props.initial);
 const root = ref<HTMLElement | null>(null);
 const retrying = ref(false);
 const error = ref('');
+
+const visibleSteps = computed(() => {
+  const steps = state.value.steps;
+  const current = steps.findIndex((step) => step.state !== 'done');
+  return current === -1 ? steps : steps.slice(0, current + 1);
+});
 
 // Done, and the gateway is taking the port: what answers next is the NAS.
 const handingOver = computed(() => state.value.phase === 'done' && !state.value.simulated);
@@ -127,13 +131,22 @@ watch(
   <div ref="root" class="wizard_install" data-testid="wizard_install">
     <ul class="app_list">
       <li
-        v-for="step in state.steps"
+        v-for="step in visibleSteps"
         :key="step.id"
         class="wizard_install_step"
         :data-testid="`wizard_install_${step.id}`"
         :data-state="step.state"
       >
         <CommonSpinner v-if="step.state === 'running'" size="small" compact />
+        <svg
+          v-else-if="step.state === 'pending'"
+          class="wizard_install_waiting"
+          viewBox="0 0 16 16"
+          :aria-label="t('stepPending')"
+        >
+          <title>{{ t('stepPending') }}</title>
+          <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+        </svg>
         <CommonIcon v-else :src="ICONS[step.state]" size="small" :label="t(STATES[step.state])" />
         <span class="wizard_install_name">{{ t(LABELS[step.id]) }}</span>
         <span v-if="step.state === 'done' && step.detail" class="muted">{{ step.detail }}</span>
@@ -150,12 +163,9 @@ watch(
     >
       {{ t('installSimulated') }}
     </p>
-    <CommonSpinner
-      v-else-if="handingOver"
-      :label="t('installHandover')"
-      centered
-      testid="wizard_handover"
-    />
+    <p v-else-if="handingOver" class="muted" data-testid="wizard_handover">
+      {{ t('installHandover') }}
+    </p>
 
     <p v-if="error" role="alert" class="app_error">{{ error }}</p>
 
@@ -191,6 +201,17 @@ watch(
 
 .wizard_install_name {
   flex: 1;
+}
+
+.wizard_install_waiting {
+  flex-shrink: 0;
+  width: $icon_small;
+  height: $icon_small;
+  color: var(--surface-border);
+}
+
+.wizard_install_step[data-state='running'] {
+  border-color: var(--accent);
 }
 
 .wizard_install_detail {

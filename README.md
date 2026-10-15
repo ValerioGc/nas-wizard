@@ -10,6 +10,10 @@ all'ultima versione, con il token dato durante la configurazione.
 1. L'utente scarica `nas-wizard-<versione>-linux-x64.tar.gz` con il suo `.sha256`, lo copia sul
    NAS e lo estrae.
 2. Esegue `sudo ./install.sh`, lo script di avvio, che non chiede niente:
+   - controlla che sistema, `/etc`, `/var/lib` e swap siano cifrati con LUKS e che ci sia un TPM
+     2.0 (`packages/pre_wizard/check-security.sh`), e se manca qualcosa si ferma prima di cambiare
+     la macchina; con `--update` e con `--development` avvisa soltanto, e `--development` lo annota
+     in `/var/lib/nas-wizard/security-development`, che il launcher segnala a ogni avvio;
    - esegue quello che serve prima del wizard (`packages/pre_wizard`): la configurazione del sistema
      operativo (`packages/os_configuration`: pacchetti e firewall di base);
    - chiede a GitHub, senza token, se esiste un wizard più recente e, se c'è, lo scarica, lo verifica

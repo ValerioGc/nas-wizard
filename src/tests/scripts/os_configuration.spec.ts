@@ -109,7 +109,7 @@ describe('system-packages.sh', () => {
 
     expect(code).toBe(0);
     expect(stdout).toContain(
-      '[dry run] apt-get install --no-install-recommends nftables network-manager wpasupplicant wireless-regdb parted e2fsprogs smartmontools',
+      '[dry run] apt-get install --no-install-recommends nftables network-manager wpasupplicant wireless-regdb parted e2fsprogs smartmontools cryptsetup',
     );
     expect(stdout).not.toContain('apt-get install polkitd');
   });
@@ -126,6 +126,8 @@ describe('system-packages.sh', () => {
         'parted',
         'e2fsprogs',
         'smartmontools',
+        'cryptsetup',
+        'cryptsetup',
       ],
     );
 
@@ -160,6 +162,7 @@ describe('pre-existing system configuration', () => {
       'parted',
       'e2fsprogs',
       'smartmontools',
+      'cryptsetup',
       'cron',
       'bluez',
     ];
@@ -262,7 +265,7 @@ describe('removing what the configuration installed', () => {
 
     expect(code).toBe(0);
     expect(stdout).toContain(
-      'apt-get install -q -y --no-install-recommends -o DPkg::Lock::Timeout=600 -- nftables network-manager wpasupplicant wireless-regdb parted e2fsprogs smartmontools',
+      'apt-get install -q -y --no-install-recommends -o DPkg::Lock::Timeout=600 -- nftables network-manager wpasupplicant wireless-regdb parted e2fsprogs smartmontools cryptsetup',
     );
     expect(stdout).not.toContain('apt-get autoremove');
     expect(stdout).not.toContain('apt-get clean');
@@ -276,6 +279,8 @@ describe('removing what the configuration installed', () => {
         'parted',
         'e2fsprogs',
         'smartmontools',
+        'cryptsetup',
+        'cryptsetup',
       ]),
     );
     expect(
@@ -380,6 +385,27 @@ describe('screen.sh', () => {
 });
 
 describe('base firewall', () => {
+  it('restores the saved HTTPS port at boot and on reload without keeping port 443 open', () => {
+    const connection = join(temp.path, 'gateway.connection');
+    writeFileSync(connection, '8443\n1\n');
+    for (const args of [['--print'], ['--print-reload']]) {
+      const result = run(join(OS_CONFIGURATION, 'files/base-firewall.sh'), {
+        args,
+        env: { NAS_GATEWAY_CONNECTION: connection },
+      });
+      expect(result.code).toBe(0);
+      expect(result.stdout).toContain('8443');
+      expect(result.stdout).toContain('tcp dport @nas_https accept');
+      expect(result.stdout).not.toContain('tcp dport 443 accept');
+    }
+    writeFileSync(connection, '65536\n1\n');
+    expect(
+      run(join(OS_CONFIGURATION, 'files/base-firewall.sh'), {
+        args: ['--print'],
+        env: { NAS_GATEWAY_CONNECTION: connection },
+      }).code,
+    ).not.toBe(0);
+  });
   it('starts with drop policies and limits exposed ports and application egress', () => {
     const { code, stdout } = run(join(OS_CONFIGURATION, 'files/base-firewall.sh'), {
       args: ['--print'],
@@ -388,7 +414,7 @@ describe('base firewall', () => {
     expect(code).toBe(0);
     expect(stdout.match(/policy drop;/g)).toHaveLength(3);
     expect(stdout).toContain('tcp dport 80 accept');
-    expect(stdout).toContain('tcp dport 443 accept');
+    expect(stdout).toContain('tcp dport @nas_https accept');
     expect(stdout).toContain('tcp dport 22 accept');
     // The port of the screen: only its browser, before every other loopback packet.
     expect(stdout).toMatch(/oif lo tcp dport 8081 (meta skuid != \d+ )?reject/);
@@ -403,7 +429,14 @@ describe('base firewall', () => {
     expect(stdout).toContain('set nas_shares {');
     expect(stdout).toContain('ip saddr @local_v4 tcp dport @nas_shares accept');
     expect(stdout).toContain('ip6 saddr @local_v6 tcp dport @nas_shares accept');
-    expect(stdout).not.toContain('dport 445');
+    expect(stdout).not.toMatch(/saddr \S+ tcp dport 445/);
+    // The network disks: out to 445 only towards the servers of the local network put in the sets.
+    expect(stdout).toContain('set nas_smb_servers {\n    type ipv4_addr\n  }');
+    expect(stdout).toContain('set nas_smb_servers6 {\n    type ipv6_addr\n  }');
+    expect(stdout).toContain('ip daddr @local_v4 ip daddr @nas_smb_servers tcp dport 445 accept');
+    expect(stdout).toContain(
+      'ip6 daddr @local_v6 ip6 daddr @nas_smb_servers6 tcp dport 445 accept',
+    );
     // The sync: in from the local network on the ports the launcher puts in, out only to it.
     expect(stdout).toContain('set nas_sync {');
     expect(stdout).toContain('set nas_apps_sync {');
@@ -447,7 +480,7 @@ describe('base firewall', () => {
       expect(stdout).not.toContain('ip6 saddr @local_v6 udp dport @nas_discovery');
       expect(stdout).toContain('tcp dport 22 accept');
       expect(stdout).toContain('tcp dport 80 accept');
-      expect(stdout).toContain('tcp dport 443 accept');
+      expect(stdout).toContain('tcp dport @nas_https accept');
     }
     const reload = run(join(OS_CONFIGURATION, 'files/base-firewall.sh'), {
       args: ['--print-reload'],
@@ -463,15 +496,21 @@ describe('base firewall', () => {
     expect(code).toBe(0);
     expect(stdout).toContain('flush chain inet nas_base output');
     expect(stdout).toContain('add rule inet nas_base input tcp dport 80 accept');
-    expect(stdout).toContain('add rule inet nas_base input tcp dport 443 accept');
+    expect(stdout).toContain('add rule inet nas_base input tcp dport @nas_https accept');
     expect(stdout).toContain('socket cgroupv2 level 2 @nas_apps_out tcp dport { 80, 443 } accept');
     expect(stdout).not.toContain('delete table');
-    expect(stdout).not.toContain('flush set');
+    expect(stdout.match(/^flush set .+$/gm)).toEqual(['flush set inet nas_base nas_https']);
     expect(stdout.indexOf('add set inet nas_base nas_apps_smtp')).toBeLessThan(
       stdout.indexOf('@nas_apps_smtp tcp dport'),
     );
     expect(stdout.indexOf('add set inet nas_base nas_shares')).toBeLessThan(
       stdout.indexOf('tcp dport @nas_shares'),
+    );
+    expect(stdout.indexOf('add set inet nas_base nas_smb_servers ')).toBeLessThan(
+      stdout.indexOf('@nas_smb_servers tcp dport 445'),
+    );
+    expect(stdout.indexOf('add set inet nas_base nas_smb_servers6')).toBeLessThan(
+      stdout.indexOf('@nas_smb_servers6 tcp dport 445'),
     );
     expect(stdout.indexOf('add set inet nas_base nas_sync')).toBeLessThan(
       stdout.indexOf('tcp dport @nas_sync'),

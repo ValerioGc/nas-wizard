@@ -50,6 +50,7 @@ The NAS installs only missing dependencies, without recommended packages:
 | `wireless-regdb`      | Supplies wireless regulatory data                 |
 | `parted`, `e2fsprogs` | Initializes explicitly selected data disks        |
 | `smartmontools`       | Reads disk health                                 |
+| `cryptsetup`          | Encrypts the data disks with LUKS2                |
 
 Pre-existing packages, including cron, Bluetooth and modem support, are preserved. The installers
 record packages and dependencies added by the NAS, including partial failed installations.

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -52,4 +52,37 @@ export function fakeCommand(directory: string, name: string, body: string) {
     },
   );
   return path;
+}
+
+/** What the check of the security of a machine reads, as `fakeMachineSecurity` sets it up. */
+export interface MachineSecurity {
+  /** The device of the system, of /etc and of /var/lib, or a swap, that is not on LUKS. */
+  plain?: string;
+  /** What `swapon` lists: name and type on each line. */
+  swap?: string;
+  /** The major version of the TPM, none for a machine without one. */
+  tpm?: string;
+}
+
+/**
+ * The commands of a machine whose system is on `/dev/mapper/vg-root`, on LUKS unless `plain`
+ * names it, with the swap and the TPM given: the environment the check needs.
+ */
+export function fakeMachineSecurity(
+  directory: string,
+  { plain = '', swap = '', tpm = '2' }: MachineSecurity = {},
+): NodeJS.ProcessEnv {
+  fakeCommand(directory, 'findmnt', 'echo /dev/mapper/vg-root');
+  fakeCommand(
+    directory,
+    'lsblk',
+    `if [[ -n ${JSON.stringify(plain)} && $* == *${JSON.stringify(plain)}* ]]; then printf 'ext4\\n'; else printf 'ext4\\nLVM2_member\\ncrypto_LUKS\\n\\n'; fi`,
+  );
+  fakeCommand(directory, 'swapon', `printf '%b' ${JSON.stringify(swap)}`);
+  const tpmClass = join(directory, 'tpm');
+  if (tpm) {
+    mkdirSync(join(tpmClass, 'tpm0'), { recursive: true });
+    writeFileSync(join(tpmClass, 'tpm0', 'tpm_version_major'), `${tpm}\n`);
+  }
+  return { NAS_TPM_CLASS: tpmClass };
 }

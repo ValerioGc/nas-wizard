@@ -6,8 +6,10 @@
 #   sudo ./install.sh
 #   ./install.sh --dry-run        # prints what it would do, without doing it
 #   sudo ./install.sh --update    # the update of a configured NAS, run by the launcher
+#   sudo ./install.sh --development  # on a machine without encrypted disk or TPM 2.0, to try it
 #
-# In order: it checks the machine, runs what comes before the wizard (packages/pre_wizard: the
+# In order: it checks the machine (Debian 13, then the system on LUKS and a TPM 2.0, which only a
+# configured NAS and the development mode let go with a warning), runs what comes before the wizard (packages/pre_wizard: the
 # configuration of the operating system), looks for a newer wizard and, when there is one, runs
 # that one instead. Then it installs the wizard on the machine (/usr/local/lib/nas-wizard, with
 # what runs after it and the configuration of the system) and starts it as the unit nas-wizard on port 80, so a closed SSH session or a
@@ -34,6 +36,8 @@ readonly UPDATES=${NAS_WIZARD_UPDATES:-/var/lib/nas-wizard-updates}
 readonly INSTALLED=${NAS_WIZARD_HOME:-/usr/local/lib/nas-wizard}
 readonly UNIT_FILE=${NAS_WIZARD_UNIT_FILE:-/etc/systemd/system/$UNIT.service}
 readonly OS_RELEASE=${NAS_OS_RELEASE:-/etc/os-release}
+# Written when the NAS is installed without the security it needs: the launcher warns about it.
+readonly DEVELOPMENT_MARK=${NAS_DEVELOPMENT_MARK:-/var/lib/nas-wizard/security-development}
 # The watcher of the monitor, installed by the configuration of the system on a machine with a
 # video output: it runs the wizard installed here.
 readonly SCREEN_UNIT=nas-os-screen.service
@@ -51,10 +55,12 @@ fail() {
 
 dry_run=false
 update=false
+development=false
 for option in "$@"; do
   case $option in
     --dry-run) dry_run=true ;;
     --update) update=true ;;
+    --development) development=true ;;
     *) fail "unknown option: $option" ;;
   esac
 done
@@ -66,6 +72,25 @@ command -v systemctl >/dev/null || fail 'systemd is not available on this machin
 version=$(. "$OS_RELEASE" 2>/dev/null && printf '%s %s' "${ID:-}" "${VERSION_ID:-}") || version=''
 [[ $version == 'debian 13' ]] || fail "this NAS runs on Debian 13, not on '${version:-an unknown system}'"
 $dry_run && printf '\nDry run: no change will be applied.\n'
+
+say "Security of the machine"
+if $update || $development; then
+  set +e
+  "$packages/pre_wizard/check-security.sh" --warn-only
+  outcome=$?
+  set -e
+  ((outcome == 0 || outcome == 3)) || fail 'the security of the machine could not be checked'
+  if $development && ! $dry_run; then
+    if ((outcome == 3)); then
+      install -d -m 0755 "$(dirname "$DEVELOPMENT_MARK")"
+      echo 'installed in development mode, without the security the NAS needs' >"$DEVELOPMENT_MARK"
+    else
+      rm -f -- "$DEVELOPMENT_MARK"
+    fi
+  fi
+else
+  "$packages/pre_wizard/check-security.sh"
+fi
 
 if $dry_run; then
   "$packages/pre_wizard/install.sh" --dry-run
@@ -90,7 +115,7 @@ else
   case $outcome in
     0)
       echo "   a newer wizard is out: running $newer/install.sh"
-      exec env NAS_WIZARD_UPDATED=1 NAS_WIZARD_ORIGIN="$here" bash "$newer/install.sh"
+      exec env NAS_WIZARD_UPDATED=1 NAS_WIZARD_ORIGIN="$here" bash "$newer/install.sh" "$@"
       ;;
     3) echo "   $("$WIZARD" --version) is the latest" ;;
     *) echo "   warning: the latest version could not be read, going on with this one" ;;

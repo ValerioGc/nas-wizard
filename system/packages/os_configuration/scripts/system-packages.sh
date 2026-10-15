@@ -10,6 +10,7 @@
 #   wireless-regdb   the radio rules of the country, for the wireless cards
 #   parted/e2fsprogs initialize empty data disks explicitly selected in nas-disk-manager
 #   smartmontools    reads the health of the disks for nas-disk-manager
+#   cryptsetup       encrypts the data disks with LUKS2 (already there on the encrypted system)
 #
 # NetworkManager leaves alone the interfaces already declared in /etc/network/interfaces, so a
 # machine reached over SSH keeps its connection while it is installed.
@@ -23,7 +24,7 @@
 
 set -euo pipefail
 
-readonly PACKAGES=(polkitd nftables network-manager wpasupplicant wireless-regdb parted e2fsprogs smartmontools)
+readonly PACKAGES=(polkitd nftables network-manager wpasupplicant wireless-regdb parted e2fsprogs smartmontools cryptsetup)
 # Overridable so the script can be tested without root and without writing into /var/lib.
 readonly STATE=${NAS_CONFIGURATION_STATE:-/var/lib/nas-os-configuration}
 readonly ROOT=${NAS_CONFIGURATION_ROOT:-}

@@ -4,7 +4,7 @@
 //! take "already done" for done. The steps before the handover are those of
 //! `packages/post_wizard/install.sh`, which announces them as it goes.
 
-use crate::config::Config;
+use crate::{config::Config, disks::Choice};
 use serde::{Deserialize, Serialize};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -14,12 +14,13 @@ use tokio::sync::{Mutex, Notify};
 
 /// The steps of the installation, in order. `handover` is the last: once the HTTPS authority was
 /// offered, the wizard leaves the ports to the gateway and ends.
-pub const STEPS: [&str; 9] = [
+pub const STEPS: [&str; 10] = [
     "download_gateway",
     "download_ui",
     "install_gateway",
     "install_ui",
     "configure",
+    "disks",
     "account",
     "certificate",
     "complete",
@@ -83,6 +84,9 @@ pub struct Configuration {
     /// The token of the private releases; none reads public releases only.
     #[serde(default)]
     pub token: Option<String>,
+    /// The empty data disks to initialize.
+    #[serde(default)]
+    pub disks: Vec<Choice>,
 }
 
 fn default_nas_name() -> String {
@@ -99,6 +103,7 @@ pub struct Request {
     pub theme: Theme,
     pub nas_name: String,
     pub token: Option<String>,
+    pub disks: Vec<Choice>,
 }
 
 /// What the page offers at the end: the authority of the NAS to trust for HTTPS.

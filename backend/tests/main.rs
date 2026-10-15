@@ -27,6 +27,9 @@ fn offline() -> (Config, PathBuf) {
         gateway: "127.0.0.1:1".to_owned(),
         post_script: PathBuf::from("/nonexistent/install.sh"),
         binary: PathBuf::from("nas-wizard"),
+        disks: false,
+        encryption: false,
+        launcher_binary: PathBuf::from("/nonexistent/nas-os-axum"),
     };
     (config, state_dir)
 }

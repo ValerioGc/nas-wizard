@@ -7,12 +7,14 @@
 //! - `complete --language <it|en> --theme <system|light|dark> --name <name>`, for the same
 //!   script: the end of the first configuration on the launcher; a detail for the step on the
 //!   output;
+//! - `disks <file>`, for the same script: the empty data disks chosen in the page, prepared by the
+//!   root code of the launcher just installed; a detail for each disk on the output;
 //! - `screen`, for `nas-os-screen.service`: the interface on a monitor connected to the NAS, while
 //!   one is (see `screen`).
 
 use nas_wizard_axum::{
     config::Config,
-    discovery,
+    discovery, disks,
     http::routes,
     installer, screen, self_update,
     state::{AppState, Language, Theme},
@@ -224,6 +226,26 @@ async fn command(arguments: &[String], config: &Config) -> Option<ExitCode> {
         {
             complete(config, language, theme, name).await
         }
+        [command, file] if command == "disks" => {
+            match disks::prepare(
+                &PathBuf::from(file),
+                &config.launcher_binary,
+                &config.state_dir,
+            )
+            .await
+            {
+                Ok(done) => {
+                    for device in done {
+                        println!("@@detail {device} ready");
+                    }
+                    ExitCode::SUCCESS
+                }
+                Err(reason) => {
+                    eprintln!("{reason}");
+                    ExitCode::FAILURE
+                }
+            }
+        }
         [command] if command == "screen" => {
             // It watches the monitor for as long as the machine runs.
             let _ = tokio::task::spawn_blocking(|| screen::run(screen::Paths::system())).await;
@@ -237,7 +259,7 @@ async fn command(arguments: &[String], config: &Config) -> Option<ExitCode> {
             eprintln!(
                 "usage: nas-wizard [self-update --into <dir> | fetch <gateway|ui> --into <dir> \
                  | complete --language <it|en> --theme <system|light|dark> --name <name> \
-                 | screen | --version]"
+                 | disks <file> | screen | --version]"
             );
             ExitCode::from(2)
         }

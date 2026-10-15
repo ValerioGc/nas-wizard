@@ -6,6 +6,7 @@
 pub mod account;
 pub mod config;
 pub mod discovery;
+pub mod disks;
 pub mod forge;
 pub mod http;
 pub mod installer;

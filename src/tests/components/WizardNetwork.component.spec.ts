@@ -114,6 +114,7 @@ it('tells the wizard whether the NAS is on a network', async () => {
   const wrapper = mount(WizardNetwork);
   await flushPromises();
   expect(wrapper.emitted('update:connected')).toEqual([[true]]);
+  expect(wrapper.emitted('connection')).toEqual([[reachable.connection]]);
 
   vi.mocked(request).mockResolvedValue({
     ...reachable,
@@ -122,4 +123,7 @@ it('tells the wizard whether the NAS is on a network', async () => {
   await wrapper.get('[data-testid="wizard_network_scan"]').trigger('click');
   await flushPromises();
   expect(wrapper.emitted('update:connected')?.at(-1)).toEqual([false]);
+  expect(wrapper.emitted('connection')?.at(-1)).toEqual([
+    { kind: 'lan', connected: false, ssid: null },
+  ]);
 });

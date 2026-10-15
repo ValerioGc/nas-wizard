@@ -21,6 +21,7 @@ const SCAN_TIMEOUT = 30000;
 const state = ref<WizardNetworks | null>(null);
 // Whether the NAS is on a network: the wizard downloads from GitHub once the choices are made.
 const connected = defineModel<boolean>('connected', { default: false });
+const emit = defineEmits<{ connection: [value: WizardNetworks['connection']] }>();
 const scanning = ref(false);
 const chosen = ref<WizardNetwork | null>(null);
 const password = ref('');
@@ -43,6 +44,7 @@ async function send(path: string, body: object, timeout: number) {
       signal: AbortSignal.timeout(timeout),
     });
     connected.value = state.value.connection.connected;
+    emit('connection', state.value.connection);
     return true;
   } catch (reason) {
     error.value = failureMessage(reason);

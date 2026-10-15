@@ -68,7 +68,7 @@ Then('the wizard downloads both releases and simulates the rest', async ({ page 
   await expect(page.getByTestId('wizard_install_download_gateway')).toContainText('version 9.9.9');
   await expect(page.getByTestId('wizard_install_download_ui')).toContainText('version 9.9.9');
   await expect(page.getByTestId('wizard_install_install_ui')).toContainText('simulated');
-  await expect(page.locator('[data-state="done"]')).toHaveCount(9);
+  await expect(page.locator('[data-state="done"]')).toHaveCount(10);
 });
 
 Given('the wizard is ready to hand over to the gateway', async ({ page }) => {

@@ -28,7 +28,7 @@ backend/
     self_update.rs               # Un wizard più recente, per lo script di avvio
     http/                        # Rotte, errore tipizzato, estrattore JSON, file dell'interfaccia
   tests/                         # Test Rust, stessi percorsi di axum/src; support.rs è condiviso
-system/packages/pre_wizard/      # Prima del wizard: la configurazione del sistema operativo
+system/packages/pre_wizard/      # Prima del wizard: controllo di LUKS e TPM, configurazione del sistema
 system/packages/os_configuration/  # Pacchetti di sistema e firewall di base
 system/packages/post_wizard/     # Dopo il wizard: scarica, installa e configura gateway e launcher
 system/packages/uninstall.sh     # Rimozione completa del NAS
@@ -81,10 +81,21 @@ I passi:
 | `install_gateway`  | `gateway_installation/install.sh --no-start`: la porta 80 è ancora del wizard              |
 | `install_ui`       | `ui_installation/install.sh`: il launcher parte su `127.0.0.1:3000`                        |
 | `configure`        | `ui_configuration/install.sh --user <utente>`, con il token sull'input                     |
+| `disks`            | `nas-wizard disks <file>`: i dischi vuoti scelti, preparati dal codice root del launcher   |
 | `account`          | `nas-os-gateway account create` con `systemd-run`, utente dinamico e cartella del gateway  |
 | `certificate`      | Solo CA del NAS (`nas-os-gateway ca`), senza dispositivi o attivazione mTLS                |
 | `complete`         | `nas-wizard complete`: aspetta il launcher (si riavvia per il token), poi `setup/complete` |
 | `handover`         | Dopo la conferma della pagina: chiude il listener, avvia il gateway, aspetta `/health`     |
+
+Il passo `disks` esiste sempre ma lavora solo se la pagina ha scelto dei dischi: con
+`WIZARD_DISKS_MODE=real` nell'unità il wizard mostra il passaggio Dischi dati (`GET
+/api/wizard/disks`, `axum/src/disks.rs`), che elenca i dischi interi interni senza il sistema e
+propone di inizializzare quelli vuoti; con anche `WIZARD_ENCRYPTION_MODE=real` propone di cifrarli
+con la sola chiave automatica, perché nel wizard in HTTP non passano password. Le scelte arrivano a
+`post_wizard` in `disks.json` nella cartella di lavoro (nessun segreto) con `--disks`; `nas-wizard
+disks` le esegue con `nas-os-axum --initialize-storage` e `nas-os-axum --storage-crypt`, che
+ricontrollano disco e identità prima di cancellare; le chiavi stanno in `/run/nas-wizard-disks`.
+Entrambi gli interruttori sono spenti finché il passaggio non è provato su una macchina.
 
 La password resta in memoria finché l'account non è creato, poi viene cancellata; né lei né il
 token compaiono mai nello stato che la pagina legge o nel journal.

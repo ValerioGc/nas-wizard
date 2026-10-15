@@ -37,6 +37,7 @@ export type StepId =
   | 'install_gateway'
   | 'install_ui'
   | 'configure'
+  | 'disks'
   | 'account'
   | 'certificate'
   | 'complete'
@@ -70,6 +71,33 @@ export interface Configuration {
   theme: Theme;
   nasName: string;
   token?: string;
+  disks?: DiskChoice[];
+}
+
+// A data disk the wizard lists: only an empty one may be initialized here.
+export interface WizardDisk {
+  device: string;
+  size: number;
+  model: string | null;
+  identity: string;
+  empty: boolean;
+}
+
+// The step of the data disks, which the wizard may have off.
+export interface WizardDisks {
+  enabled: boolean;
+  encryption: boolean;
+  disks: WizardDisk[];
+}
+
+// What becomes of an empty disk: left as it is, initialized, or initialized encrypted.
+export type DiskPlan = 'keep' | 'plain' | 'encrypted';
+
+// An empty disk to initialize, as the page sends it.
+export interface DiskChoice {
+  device: string;
+  identity: string;
+  encrypt: boolean;
 }
 
 // What the end of the installation offers to download: the authority of the NAS for HTTPS.

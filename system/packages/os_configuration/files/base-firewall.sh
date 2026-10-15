@@ -8,7 +8,13 @@ set -euo pipefail
 
 readonly TABLE=nas_base
 readonly GATEWAY_PORT=80
-readonly GATEWAY_TLS_PORT=443
+GATEWAY_TLS_PORT=443
+readonly CONNECTION=${NAS_GATEWAY_CONNECTION:-/var/lib/nas-os-gateway/gateway.connection}
+if [[ -f $CONNECTION ]]; then
+  IFS= read -r GATEWAY_TLS_PORT <"$CONNECTION"
+  [[ $GATEWAY_TLS_PORT =~ ^[1-9][0-9]{0,4}$ ]] && ((GATEWAY_TLS_PORT <= 65535)) || exit 1
+fi
+readonly GATEWAY_TLS_PORT
 readonly SSH_PORT=22
 # The port of the monitor connected to the NAS, on the loopback: the wizard, then the gateway,
 # answer there without a device certificate, so only the browser of the screen may reach it.
@@ -41,7 +47,7 @@ input_rules=(
   'udp sport 67 udp dport 68 accept'
   'udp sport 547 udp dport 546 accept'
   "tcp dport $GATEWAY_PORT accept"
-  "tcp dport $GATEWAY_TLS_PORT accept"
+  'tcp dport @nas_https accept'
   "ip saddr @local_v4 tcp dport $SSH_PORT accept"
   "ip6 saddr @local_v6 tcp dport $SSH_PORT accept"
   # The folders shared on the local network (SMB): the launcher puts 445 in the set while one is
@@ -71,6 +77,11 @@ output_rules=(
   "meta skuid { $web_uids } tcp dport { 80, 443 } accept"
   'socket cgroupv2 level 2 @nas_apps_out tcp dport { 80, 443 } accept'
   'socket cgroupv2 level 2 @nas_apps_smtp tcp dport { 25, 465, 587 } accept'
+  # The network disks (SMB) the NAS mounts: the kernel reaches the server, with no cgroup and no
+  # user to tell it by, so the launcher puts in the sets the addresses of the local network of the
+  # servers it connects to, and only those.
+  'ip daddr @local_v4 ip daddr @nas_smb_servers tcp dport 445 accept'
+  'ip6 daddr @local_v6 ip6 daddr @nas_smb_servers6 tcp dport 445 accept'
   # The application of the sync reaches only the local network, on the ports of Syncthing, and
   # announces itself on the broadcast and the multicast of the local discovery.
   'socket cgroupv2 level 2 @nas_apps_sync ip daddr @local_v4 tcp dport 22000 accept'
@@ -89,12 +100,16 @@ chain_rules() {
 }
 
 reload_rules() {
+  printf 'add set inet %s nas_https { type inet_service; }\n' "$TABLE"
+  printf 'flush set inet %s nas_https\nadd element inet %s nas_https { %s }\n' "$TABLE" "$TABLE" "$GATEWAY_TLS_PORT"
   # A table loaded by an older version lacks the sets added since; `add set` keeps an existing one.
   printf 'add set inet %s nas_apps_smtp { type cgroupsv2; }\n' "$TABLE"
   printf 'add set inet %s nas_shares { type inet_service; }\n' "$TABLE"
   printf 'add set inet %s nas_sync { type inet_service; }\n' "$TABLE"
   printf 'add set inet %s nas_apps_sync { type cgroupsv2; }\n' "$TABLE"
   printf 'add set inet %s nas_discovery { type inet_service; }\n' "$TABLE"
+  printf 'add set inet %s nas_smb_servers { type ipv4_addr; }\n' "$TABLE"
+  printf 'add set inet %s nas_smb_servers6 { type ipv6_addr; }\n' "$TABLE"
   printf 'flush chain inet %s input\n' "$TABLE"
   for rule in "${input_rules[@]}"; do
     printf 'add rule inet %s input %s\n' "$TABLE" "$rule"
@@ -108,6 +123,10 @@ reload_rules() {
 ruleset() {
   cat <<RULES
 table inet $TABLE {
+  set nas_https {
+    type inet_service
+    elements = { $GATEWAY_TLS_PORT }
+  }
   set local_v4 {
     type ipv4_addr
     flags interval
@@ -142,6 +161,14 @@ table inet $TABLE {
 
   set nas_discovery {
     type inet_service
+  }
+
+  set nas_smb_servers {
+    type ipv4_addr
+  }
+
+  set nas_smb_servers6 {
+    type ipv6_addr
   }
 
   chain input {

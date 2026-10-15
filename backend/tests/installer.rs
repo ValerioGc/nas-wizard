@@ -12,6 +12,7 @@ fn configuration(username: &str, token: Option<&str>) -> Configuration {
         theme: Theme::Dark,
         nas_name: "attic".to_owned(),
         token: token.map(str::to_owned),
+        disks: Vec::new(),
     }
 }
 
@@ -89,6 +90,7 @@ fn neither_the_token_nor_the_password_goes_on_the_command_line() {
         theme: Theme::Light,
         nas_name: "attic".to_owned(),
         token: Some("ghp_secret".to_owned()),
+        disks: Vec::new(),
     };
     let arguments = arguments(
         &config("http://127.0.0.1:1", &scratch.0),
@@ -127,13 +129,15 @@ async fn the_script_after_the_wizard_runs_every_step_and_the_wizard_follows_it()
     assert_eq!(ready.steps[0].detail, "version 9.9.9");
     assert_eq!(ready.steps[1].detail, "version 9.9.9");
     assert_eq!(ready.steps[3].detail, "simulated");
-    assert_eq!(ready.steps[6].id, "certificate");
+    assert_eq!(ready.steps[5].id, "disks");
+    assert_eq!(ready.steps[5].detail, "none");
+    assert_eq!(ready.steps[7].id, "certificate");
 
     let offered = offer(&state).await.expect("an offer");
     assert_eq!(offered.ca_pem, None, "a simulation installs no gateway");
     let done = finish(&state).await.expect("finished");
     assert_eq!(done.phase, Phase::Done);
-    assert_eq!(done.steps[8].detail, "simulated");
+    assert_eq!(done.steps[9].detail, "simulated");
     assert!(finish(&state).await.is_err(), "only once");
     assert!(offer(&state).await.is_err());
     assert_eq!(
@@ -298,4 +302,48 @@ async fn fetches_the_gateway_and_cleans_up_what_it_downloaded() {
 
     clean(&settings).await;
     assert!(!scratch.0.join("gateway").exists());
+}
+
+#[tokio::test]
+async fn no_disk_is_chosen_while_the_step_of_the_disks_is_off() {
+    let scratch = Scratch::new();
+    let state = state(&scratch);
+    let mut input = configuration("owner", None);
+    input.disks = vec![crate::disks::Choice {
+        device: "sdb".to_owned(),
+        identity: "w/s/1".to_owned(),
+        encrypt: false,
+    }];
+
+    let refused = start(&state, input).await.expect_err("refused");
+    assert!(refused.1.contains("not prepared by the wizard"));
+    assert_eq!(state.current().await.phase, Phase::Collecting);
+}
+
+#[test]
+fn the_script_gets_the_list_of_the_disks_when_some_were_chosen() {
+    let scratch = Scratch::new();
+    let settings = config("http://127.0.0.1:1", &scratch.0);
+    let mut request = Request {
+        username: "Owner".to_owned(),
+        user: "owner".to_owned(),
+        password: "long enough".to_owned(),
+        language: Language::En,
+        theme: Theme::Light,
+        nas_name: "attic".to_owned(),
+        token: None,
+        disks: Vec::new(),
+    };
+    assert!(!arguments(&settings, "disks", &request).contains(&"--disks".to_owned()));
+    request.disks = vec![crate::disks::Choice {
+        device: "sdb".to_owned(),
+        identity: "w/s/1".to_owned(),
+        encrypt: true,
+    }];
+    let listed = arguments(&settings, "disks", &request);
+    let at = listed
+        .iter()
+        .position(|argument| argument == "--disks")
+        .expect("--disks");
+    assert_eq!(listed[at + 1], disks_file(&settings).to_string_lossy());
 }

@@ -14,6 +14,7 @@
 use crate::{
     account,
     config::Config,
+    disks,
     forge::{self, Wanted},
     http::error::ApiFailure,
     state::{AppState, Configuration, Language, Offer, Phase, Request, Snapshot, StepState, Theme},
@@ -77,6 +78,9 @@ pub async fn start(state: &AppState, input: Configuration) -> Result<Snapshot, A
         ));
     }
     let user = account::check(&input.username, &input.password).await?;
+    if !input.disks.is_empty() {
+        disks::check(&input.disks, &disks::offer(&state.config).await).map_err(ApiFailure::bad)?;
+    }
 
     let mut wizard = state.wizard.lock().await;
     if wizard.phase != Phase::Collecting {
@@ -92,6 +96,7 @@ pub async fn start(state: &AppState, input: Configuration) -> Result<Snapshot, A
         theme: input.theme,
         nas_name,
         token,
+        disks: input.disks,
     });
     wizard.phase = Phase::Installing;
     tokio::spawn(run(state.clone()));
@@ -270,10 +275,19 @@ fn arguments(config: &Config, from: &str, request: &Request) -> Vec<String> {
         "--from".to_owned(),
         from.to_owned(),
     ];
+    if !request.disks.is_empty() {
+        arguments.push("--disks".to_owned());
+        arguments.push(disks_file(config).to_string_lossy().into_owned());
+    }
     if !config.real {
         arguments.push("--simulate".to_owned());
     }
     arguments
+}
+
+/// Where the choices of the disks wait for the script: no secret in them.
+pub fn disks_file(config: &Config) -> PathBuf {
+    config.state_dir.join("disks.json")
 }
 
 /// Follows one stream of the script, step by step, keeping its last lines.
@@ -349,6 +363,12 @@ fn keep(output: &Mutex<VecDeque<String>>, text: &str) {
 /// Runs the script from `from`, with the token, the account name and the password on its input.
 async fn post_wizard(state: &AppState, from: &str, request: &Request) -> Result<(), String> {
     let config = &state.config;
+    if !request.disks.is_empty() {
+        let choices = serde_json::to_vec(&request.disks).map_err(|error| error.to_string())?;
+        tokio::fs::write(disks_file(config), choices)
+            .await
+            .map_err(|error| format!("cannot hand the disks to the script: {error}"))?;
+    }
     let mut child = Command::new("bash")
         .args(arguments(config, from, request))
         .stdin(Stdio::piped())

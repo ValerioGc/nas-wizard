@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import WizardView from '@/views/WizardView.vue';
 import { request } from '@/api/client';
 import { locale, setLocale } from '@/i18n';
-import type { WizardState } from '@/types/types';
+import type { WizardDisks, WizardNetworks, WizardState } from '@/types/types';
 
 vi.mock('@/api/client', () => ({ request: vi.fn() }));
 
-const networks = {
+const networks: WizardNetworks = {
   connection: { kind: 'lan', connected: true, ssid: null },
   wifi: [],
   canConnect: true,
@@ -23,12 +23,18 @@ function wizard(phase: WizardState['phase']): WizardState {
   };
 }
 
-/** The wizard answering as it does: its state, the networks, and the installation it starts. */
-function answering(state: WizardState) {
+const noDisks: WizardDisks = { enabled: false, encryption: false, disks: [] };
+
+/**
+ * The wizard answering as it does: its state, the networks, its data disks and the installation it
+ * starts.
+ */
+function answering(state: WizardState, disks: WizardDisks = noDisks) {
   vi.mocked(request).mockImplementation((path: string) => {
     const answers: Record<string, unknown> = {
       '/wizard': state,
       '/wizard/network/scan': networks,
+      '/wizard/disks': disks,
       '/wizard/install': wizard('installing'),
     };
     return Promise.resolve(answers[path] as never);
@@ -36,6 +42,7 @@ function answering(state: WizardState) {
 }
 
 beforeEach(() => {
+  networks.connection = { kind: 'lan', connected: true, ssid: null };
   vi.stubGlobal('matchMedia', () => ({
     matches: false,
     addEventListener: vi.fn(),
@@ -162,7 +169,22 @@ describe('setup wizard', () => {
 
     expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('admin');
     expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('attic');
+    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('rete via cavo');
+    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('Impostata');
+    expect(
+      wrapper
+        .get('[data-testid="wizard_summary"]')
+        .findAll('dt')
+        .map((label) => label.text()),
+    ).toEqual(['Nome utente', 'Password', 'Connessione', 'Lingua', 'Tema', 'Token']);
+    expect(
+      wrapper
+        .get('[data-testid="wizard_summary"]')
+        .findAll('dd')
+        .map((value) => value.text()),
+    ).toEqual(['admin', 'Impostata', 'rete via cavo', 'Italiano', 'Scuro', 'Impostato']);
     expect(wrapper.get('[data-testid="wizard_summary"]').text()).not.toContain('ghp_token');
+    expect(wrapper.get('[data-testid="wizard_summary"]').text()).not.toContain('long enough');
     await wrapper.get('[data-testid="wizard_finish"]').trigger('click');
     await flushPromises();
 
@@ -193,6 +215,15 @@ describe('setup wizard', () => {
     expect(wrapper.get('h1').text()).toBe('Nome, lingua e tema');
     expect(wrapper.find('[data-testid="wizard_mtls"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="wizard_device_name"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('includes the connected Wi-Fi SSID in the final summary', async () => {
+    networks.connection = { kind: 'wifi', connected: true, ssid: 'Home Office' };
+    const wrapper = await opened();
+    await walkThrough(wrapper);
+    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('Wi-Fi · Home Office');
+    expect(wrapper.get('[data-testid="wizard_summary"]').text()).not.toContain('rete via cavo');
     wrapper.unmount();
   });
 
@@ -254,5 +285,45 @@ describe('setup wizard', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('the wizard is not answering');
     expect(wrapper.find('[data-testid="wizard_start"]').exists()).toBe(false);
     wrapper.unmount();
+  });
+
+  it('offers the empty data disks where the wizard prepares them, and sends the chosen ones', async () => {
+    answering(wizard('collecting'), {
+      enabled: true,
+      encryption: true,
+      disks: [
+        { device: 'sdb', size: 2e12, model: 'Data Disk', identity: 'w/s/1', empty: true },
+        { device: 'sdc', size: 1e12, model: null, identity: 'w/s/2', empty: false },
+      ],
+    });
+    const wrapper = await opened();
+    await wrapper.get('[data-testid="wizard_start"]').trigger('click');
+    await wrapper.get('[data-testid="wizard_username"]').setValue('admin');
+    await wrapper.get('[data-testid="wizard_password"]').setValue('long enough');
+    await wrapper.get('[data-testid="wizard_confirm"]').setValue('long enough');
+    await next(wrapper).trigger('click');
+    await next(wrapper).trigger('click');
+    await flushPromises();
+    await next(wrapper).trigger('click');
+
+    const step = wrapper.get('[data-testid="wizard_disks"]');
+    expect(step.text()).toContain('/dev/sdb');
+    expect(step.text()).toContain('Data Disk');
+    expect(step.text()).toContain('Contiene già dati');
+    expect(wrapper.find('[data-testid="wizard_disk_sdc_keep"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="wizard_disk_sdb_encrypted"]').trigger('click');
+    expect(step.text()).toContain('cancella tutto');
+    await next(wrapper).trigger('click');
+    await next(wrapper).trigger('click');
+    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('sdb (cifrato)');
+    await wrapper.get('[data-testid="wizard_finish"]').trigger('click');
+    await flushPromises();
+
+    const sent = vi
+      .mocked(request)
+      .mock.calls.find(([path]) => path === '/wizard/install')?.[1] as RequestInit;
+    expect(JSON.parse(sent.body as string).disks).toEqual([
+      { device: 'sdb', identity: 'w/s/1', encrypt: true },
+    ]);
   });
 });

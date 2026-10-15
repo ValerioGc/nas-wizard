@@ -64,30 +64,31 @@ async function check() {
   <div class="wizard_token">
     <CommonField :error="error">
       <label for="wizard_token">{{ t('tokenField') }}</label>
-      <CommonPasswordInput
-        id="wizard_token"
-        v-model="token"
-        spellcheck="false"
-        maxlength="512"
-        :aria-invalid="!!error"
-        data-testid="wizard_token"
-        @focus="touched = true"
-      />
+      <div class="wizard_token_controls">
+        <CommonPasswordInput
+          id="wizard_token"
+          v-model="token"
+          spellcheck="false"
+          maxlength="512"
+          :aria-invalid="!!error"
+          data-testid="wizard_token"
+          @focus="touched = true"
+        />
+        <button
+          type="button"
+          :disabled="checking || !!error"
+          data-testid="wizard_token_check"
+          @click="check"
+        >
+          <CommonSpinner v-if="checking" size="small" compact />
+          {{ t('tokenCheck') }}
+        </button>
+      </div>
     </CommonField>
 
     <p class="muted" data-testid="wizard_token_note">
       {{ t('tokenEmptyNote') }}
     </p>
-
-    <button
-      type="button"
-      :disabled="checking || !!error"
-      data-testid="wizard_token_check"
-      @click="check"
-    >
-      <CommonSpinner v-if="checking" size="small" compact />
-      {{ t('tokenCheck') }}
-    </button>
 
     <p v-if="failure" role="alert" class="app_error">{{ failure }}</p>
 
@@ -115,6 +116,18 @@ async function check() {
 .wizard_token_answer {
   @extend %fx_base;
   gap: $space_2;
+}
+
+.wizard_token_controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: start;
+  gap: $space_2;
+
+  button {
+    font-size: $text_label;
+    white-space: nowrap;
+  }
 }
 
 .wizard_token_repository {

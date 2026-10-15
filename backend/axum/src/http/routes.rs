@@ -2,6 +2,7 @@
 //! page of a router, the wizard answers whoever reaches it first, and only until it ends.
 
 use crate::{
+    disks,
     http::{error::ApiFailure, extract::ValidJson, interface},
     installer, network,
     state::{AppState, Configuration, Offer, Snapshot},
@@ -28,6 +29,10 @@ async fn join_wifi(
     ValidJson(request): ValidJson<network::WifiRequest>,
 ) -> Result<Json<network::Networks>, ApiFailure> {
     network::join(state.config.real, &request).await.map(Json)
+}
+
+async fn list_disks(State(state): State<AppState>) -> Json<disks::Offer> {
+    Json(disks::offer(&state.config).await)
 }
 
 async fn check_token(
@@ -92,6 +97,7 @@ pub fn router(state: AppState) -> Router {
         .route("/wizard", get(wizard))
         .route("/wizard/network/scan", post(scan))
         .route("/wizard/network/wifi", post(join_wifi))
+        .route("/wizard/disks", get(list_disks))
         .route("/wizard/token", post(check_token))
         .route("/wizard/install", post(install))
         .route("/wizard/retry", post(retry))

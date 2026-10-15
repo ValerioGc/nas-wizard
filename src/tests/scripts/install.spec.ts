@@ -1,13 +1,22 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { fakeCommand, OS_CONFIGURATION, ROOT, run, workspace } from './helpers';
+import {
+  fakeCommand,
+  fakeMachineSecurity,
+  OS_CONFIGURATION,
+  ROOT,
+  run,
+  workspace,
+  type MachineSecurity,
+} from './helpers';
 
 const scripts = [
   join(ROOT, 'install.sh'),
   join(ROOT, 'system/packages/uninstall.sh'),
   join(ROOT, 'system/packages/pre_wizard/install.sh'),
+  join(ROOT, 'system/packages/pre_wizard/check-security.sh'),
   join(ROOT, 'system/packages/post_wizard/install.sh'),
   join(ROOT, 'system/packages/post_wizard/clean-package.sh'),
   ...[
@@ -27,18 +36,28 @@ beforeEach(() => {
 
 afterEach(() => temp.remove());
 
-/** The entry script on a machine that says it is `system`, with the packages it needs present. */
+/**
+ * The entry script on a machine that says it is `system`, with the packages it needs present and,
+ * unless `security` says otherwise, the system on LUKS and a TPM 2.0.
+ */
 function entry(
   args: string[],
   system = 'ID=debian\nVERSION_ID="13"\n',
   env: NodeJS.ProcessEnv = {},
+  security: MachineSecurity = {},
 ) {
   const release = join(temp.path, 'os-release');
   writeFileSync(release, system);
   fakeCommand(temp.path, 'dpkg-query', "printf 'install ok installed'");
+  const machine = fakeMachineSecurity(temp.path, security);
   return run(join(ROOT, 'install.sh'), {
     args,
-    env: { NAS_OS_RELEASE: release, PATH: `${temp.path}:${process.env.PATH}`, ...env },
+    env: {
+      NAS_OS_RELEASE: release,
+      PATH: `${temp.path}:${process.env.PATH}`,
+      ...machine,
+      ...env,
+    },
   });
 }
 
@@ -83,13 +102,16 @@ describe('install.sh', () => {
   });
 
   it('names the folder the user unpacked even when a newer wizard runs in its place', () => {
-    const { stdout } = entry(['--dry-run'], undefined, {
+    const { code, stdout } = entry(['--dry-run'], undefined, {
       NAS_WIZARD_ORIGIN: '/home/nas/nas-wizard',
     });
     const source = readFileSync(join(ROOT, 'install.sh'), 'utf8');
 
+    expect(code).toBe(0);
     expect(stdout).toContain('Environment="NAS_WIZARD_PACKAGE=/home/nas/nas-wizard"');
-    expect(source).toContain('exec env NAS_WIZARD_UPDATED=1 NAS_WIZARD_ORIGIN="$here" bash');
+    expect(source).toContain(
+      'exec env NAS_WIZARD_UPDATED=1 NAS_WIZARD_ORIGIN="$here" bash "$newer/install.sh" "$@"',
+    );
   });
 
   it('installs the configuration of the system with the wizard, for the uninstall.sh left alone', () => {
@@ -187,6 +209,49 @@ else exit 0; fi`,
 
     expect(stdout).not.toMatch(/token/i);
     expect(stdout).toContain('== Operating system');
+  });
+
+  it('stops before changing anything on a machine without LUKS or TPM 2.0', () => {
+    const { code, output } = entry(['--dry-run'], undefined, {}, { plain: 'vg-root' });
+
+    expect(code).toBe(1);
+    expect(output).toContain('== Security of the machine');
+    expect(output).toContain('./install.sh --development');
+    expect(output).not.toContain('== Operating system');
+  });
+
+  it.each([['--update'], ['--development']])('only warns about the security with %s', (option) => {
+    const { code, stdout } = entry([option, '--dry-run'], undefined, {}, { tpm: '' });
+
+    expect(code).toBe(0);
+    expect(stdout).toContain('no TPM 2.0');
+    expect(stdout).toContain('going on without it');
+    expect(stdout).toContain('== Operating system');
+  });
+
+  it('marks a NAS installed in development mode, and clears the mark when nothing is missing', () => {
+    const source = readFileSync(join(ROOT, 'install.sh'), 'utf8');
+    const block = source.slice(
+      source.indexOf('if $update || $development; then'),
+      source.indexOf('\nif $dry_run; then\n  "$packages/pre_wizard/install.sh"'),
+    );
+    const mark = join(temp.path, 'state', 'security-development');
+    const script = join(temp.path, 'mark.sh');
+    const checker = join(temp.path, 'packages', 'pre_wizard');
+    const marked = (outcome: number) => {
+      fakeCommand(temp.path, 'packages/pre_wizard/check-security.sh', `exit ${outcome}`);
+      writeFileSync(
+        script,
+        `set -euo pipefail\nupdate=false\ndevelopment=true\ndry_run=false\npackages=${temp.path}/packages\nDEVELOPMENT_MARK=${mark}\nfail() { echo "$1" >&2; exit 1; }\n${block}`,
+      );
+      expect(run(script).code).toBe(0);
+      return existsSync(mark);
+    };
+    mkdirSync(checker, { recursive: true });
+
+    expect(marked(3)).toBe(true);
+    expect(readFileSync(mark, 'utf8')).toContain('development mode');
+    expect(marked(0)).toBe(false);
   });
 
   it('runs on Debian 13 only', () => {

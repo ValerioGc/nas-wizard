@@ -47,7 +47,24 @@ export default {
   wizardNetworkFixed:
     'Network management not available in this installation, the current connection stays active.',
   wizardTokenTitle: 'Release token',
+  wizardDisksTitle: 'Data disks',
+  wizardDisksIntro:
+    'Empty disks to prepare for data. Disks with data stay as they are and appear in Explorer. This step is optional.',
+  wizardDisksNone: 'No empty data disk is connected.',
+  wizardDiskInUse: 'Already holds data: it stays as it is',
+  wizardDiskKeep: 'Leave as it is',
+  wizardDiskPlain: 'Initialize',
+  wizardDiskEncrypted: 'Initialize encrypted',
+  wizardDiskWarning: 'Initializing a disk erases all of its content.',
+  wizardDiskEncryptedNote:
+    'An encrypted disk unlocks by itself at startup. After signing in, set a password and a recovery key in the Disks app.',
+  wizardDisksSummary: 'Disks to initialize',
+  wizardDisksSummaryNone: 'None',
+  wizardDiskEncryptedShort: 'encrypted',
   wizardSummaryTitle: 'Summary',
+  wizardConnection: 'Connection',
+  wizardCurrentConnection: 'Current connection',
+  wizardPasswordSet: 'Set',
   wizardSummaryIntro:
     'A summary of the choices made, to be confirmed to complete the configuration.',
   wizardComplete: 'Complete the configuration',
@@ -89,6 +106,7 @@ export default {
   stepInstallGateway: 'Installing the gateway',
   stepInstallUi: 'Installing the launcher',
   stepConfigure: 'Token, user of the terminal and data disks',
+  stepDisks: 'Initialization of the data disks',
   stepAccount: 'Account of the NAS',
   stepComplete: 'Language and theme of the launcher',
   stepHandover: 'Starting the gateway',

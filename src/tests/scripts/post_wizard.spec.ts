@@ -19,6 +19,7 @@ const STEPS = [
   'install_gateway',
   'install_ui',
   'configure',
+  'disks',
   'account',
   'certificate',
   'complete',
@@ -78,6 +79,27 @@ describe('post_wizard/install.sh', () => {
     expect(stdout).toContain('@@detail version 9.9.9');
     expect(stdout).toContain('@@detail simulated');
     expect(stdout.match(/@@done /g)).toHaveLength(STEPS.length);
+  });
+
+  it('prepares the chosen disks with the wizard once the launcher is there, none without a list', () => {
+    const none = postWizard(['--simulate']);
+    expect(none.stdout).toMatch(/@@step disks\n@@detail none\n@@done disks/);
+
+    const list = join(temp.path, 'disks.json');
+    writeFileSync(list, '[{"device":"sdb","identity":"x/y/1","encrypt":true}]');
+    const simulated = postWizard(['--disks', list, '--simulate']);
+    expect(simulated.code).toBe(0);
+    expect(simulated.stdout).toMatch(/@@step disks\n@@detail simulated\n@@done disks/);
+
+    const missing = postWizard(['--disks', join(temp.path, 'nothing.json'), '--simulate']);
+    expect(missing.code).not.toBe(0);
+    expect(missing.output).toContain('the list of the disks is not at');
+
+    const script = readFileSync(SCRIPT, 'utf8');
+    expect(script.indexOf('step disks prepare_disks')).toBeGreaterThan(
+      script.indexOf('step configure configure'),
+    );
+    expect(script).toContain('"$wizard" disks "$disks"');
   });
 
   it('hands the token to the downloads in a file, never on a command line', () => {

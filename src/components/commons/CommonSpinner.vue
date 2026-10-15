@@ -27,7 +27,14 @@ const props = withDefaults(defineProps<Props>(), {
     aria-live="polite"
     :data-testid="props.testid"
   >
-    <span class="common_spinner_ring" :class="`common_spinner_${props.size}`"></span>
+    <span
+      class="common_spinner_ring"
+      :class="{
+        common_spinner_small: props.size === 'small',
+        common_spinner_medium: props.size === 'medium',
+        common_spinner_large: props.size === 'large',
+      }"
+    ></span>
 
     <span :class="{ visually_hidden: props.compact }">{{ props.label ?? t('loading') }}</span>
   </output>

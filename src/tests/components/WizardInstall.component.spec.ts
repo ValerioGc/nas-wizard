@@ -26,6 +26,54 @@ afterEach(() => {
 });
 
 describe('installation', () => {
+  it('reveals the next step only after the previous one completes, with a spinner only while running', async () => {
+    const first: InstallStep = { id: 'download_gateway', state: 'pending', detail: '' };
+    const second: InstallStep = { id: 'download_ui', state: 'pending', detail: '' };
+    const third: InstallStep = { id: 'install_gateway', state: 'pending', detail: '' };
+    const wrapper = mount(WizardInstall, {
+      props: { initial: state('installing', [first, second, third]) },
+    });
+    expect(wrapper.findAll('[data-state]')).toHaveLength(1);
+    expect(wrapper.find('.common_spinner').exists()).toBe(false);
+    expect(wrapper.get('svg.wizard_install_waiting').attributes('aria-label')).toBe('In attesa');
+    expect(wrapper.get('svg.wizard_install_waiting title').text()).toBe('In attesa');
+
+    vi.mocked(request).mockResolvedValue(
+      state('installing', [{ ...first, state: 'running' }, second, third]),
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(wrapper.findAll('[data-state]')).toHaveLength(1);
+    expect(wrapper.findAll('.common_spinner')).toHaveLength(1);
+    expect(wrapper.find('[data-testid="wizard_install_download_ui"]').exists()).toBe(false);
+
+    vi.mocked(request).mockResolvedValue(
+      state('installing', [{ ...first, state: 'done' }, { ...second, state: 'running' }, third]),
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(wrapper.findAll('[data-state]').map((row) => row.attributes('data-state'))).toEqual([
+      'done',
+      'running',
+    ]);
+    expect(wrapper.findAll('.common_spinner')).toHaveLength(1);
+    expect(wrapper.find('[data-testid="wizard_install_install_gateway"]').exists()).toBe(false);
+
+    vi.mocked(request).mockResolvedValue(
+      state('failed', [
+        { ...first, state: 'done' },
+        { ...second, state: 'failed', detail: 'network unreachable' },
+        third,
+      ]),
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(wrapper.get('[data-testid="wizard_install_download_ui"]').text()).toContain(
+      'network unreachable',
+    );
+    expect(wrapper.findAll('.common_spinner')).toHaveLength(0);
+    expect(wrapper.find('[data-testid="wizard_install_install_gateway"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="wizard_retry"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
   it('lists the steps and follows them until they are done', async () => {
     const wrapper = mount(WizardInstall, {
       props: { initial: state('installing', [gateway, launcher]) },

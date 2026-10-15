@@ -106,7 +106,7 @@ async fn the_page_reads_where_the_wizard_is_and_never_a_secret() {
     assert_eq!(body["phase"], "collecting");
     assert_eq!(body["simulated"], true);
     assert!(body.get("tokenGiven").is_none());
-    assert_eq!(body["steps"].as_array().expect("steps").len(), 9);
+    assert_eq!(body["steps"].as_array().expect("steps").len(), 10);
     assert!(!body.to_string().contains("password"));
 }
 

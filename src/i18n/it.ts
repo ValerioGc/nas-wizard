@@ -48,7 +48,24 @@ export default {
   wizardNetworkFixed:
     'Gestione della rete non disponibile in questa installazione, resta attiva la connessione attuale.',
   wizardTokenTitle: 'Token delle release',
+  wizardDisksTitle: 'Dischi dati',
+  wizardDisksIntro:
+    'Dischi vuoti da preparare per i dati. I dischi con dati restano come sono e compaiono in Explorer. Il passaggio è facoltativo.',
+  wizardDisksNone: 'Nessun disco dati vuoto collegato.',
+  wizardDiskInUse: 'Contiene già dati: resta com’è',
+  wizardDiskKeep: 'Lascia così',
+  wizardDiskPlain: 'Inizializza',
+  wizardDiskEncrypted: 'Inizializza cifrato',
+  wizardDiskWarning: 'Inizializzare un disco cancella tutto il suo contenuto.',
+  wizardDiskEncryptedNote:
+    'Un disco cifrato si sblocca da solo all’avvio. Dopo l’accesso imposta una password e una chiave di recupero dall’app Dischi.',
+  wizardDisksSummary: 'Dischi da inizializzare',
+  wizardDisksSummaryNone: 'Nessuno',
+  wizardDiskEncryptedShort: 'cifrato',
   wizardSummaryTitle: 'Riepilogo',
+  wizardConnection: 'Connessione',
+  wizardCurrentConnection: 'Connessione attuale',
+  wizardPasswordSet: 'Impostata',
   wizardSummaryIntro:
     'Riepilogo delle scelte effettuate, da confermare per completare la configurazione.',
   wizardComplete: 'Completa la configurazione',
@@ -90,6 +107,7 @@ export default {
   stepInstallGateway: 'Installazione del gateway',
   stepInstallUi: 'Installazione del launcher',
   stepConfigure: 'Token, utente del terminale e dischi dati',
+  stepDisks: 'Inizializzazione dei dischi dati',
   stepAccount: 'Account del NAS',
   stepComplete: 'Lingua e tema del launcher',
   stepHandover: 'Avvio del gateway',

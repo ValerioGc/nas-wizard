@@ -6,12 +6,14 @@
 #
 #   printf '%s\n%s\n%s\n' "$token" "$account" "$password" | sudo ./install.sh \
 #     --user <user of the terminal> --language <it|en> --theme <system|light|dark> \
-#     --name <name of the NAS> --wizard <nas-wizard> --work <directory> [--from <step>] [--simulate]
+#     --name <name of the NAS> --wizard <nas-wizard> --work <directory> [--disks <file>]
+#     [--from <step>] [--simulate]
 #
 # In order: it downloads the latest gateway and launcher with the token and checks them against
 # their published checksums (`nas-wizard fetch`), installs the gateway without starting it (port
 # 80 is still the wizard's), installs the launcher, stores the token, creates the user of the
-# terminal and reconciles its data volumes (ui_configuration), creates the account in the
+# terminal and reconciles its data volumes (ui_configuration), prepares the empty data disks chosen
+# in the page with the root code of the launcher (`nas-wizard disks`), creates the account in the
 # gateway, has the gateway make the HTTPS authority of the NAS (left in the work directory for
 # the wizard to offer), hands the name of the NAS, language and theme to the launcher (`nas-wizard complete`), which ends the
 # first configuration and makes the name the hostname. Last, clean-package.sh puts the manuals in
@@ -34,17 +36,17 @@ installed=$(cd -- "$here/../.." && pwd)
 package=${NAS_WIZARD_PACKAGE:-$installed}
 [[ -d $package ]] || package=$installed
 readonly here installed package
-readonly STEPS=(download_gateway download_ui install_gateway install_ui configure account certificate complete)
+readonly STEPS=(download_gateway download_ui install_gateway install_ui configure disks account certificate complete)
 
 fail() {
   printf 'error: %s\n' "$1" >&2
   exit 2
 }
 
-user='' language='' theme='' name='' wizard='' work='' from='' simulate=false
+user='' language='' theme='' name='' wizard='' work='' disks='' from='' simulate=false
 while (($# > 0)); do
   case $1 in
-    --user | --language | --theme | --name | --wizard | --work | --from)
+    --user | --language | --theme | --name | --wizard | --work | --disks | --from)
       (($# >= 2)) || fail "$1 needs a value"
       declare "${1#--}=$2"
       shift 2
@@ -63,6 +65,7 @@ done
 [[ $name =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$ ]] || fail "not a name for the NAS: ${name:-<empty>}"
 [[ -x $wizard ]] || fail "the wizard is not at ${wizard:-<empty>}"
 [[ -n $work ]] || fail '--work names no directory'
+[[ -z $disks || -f $disks ]] || fail "the list of the disks is not at $disks"
 if [[ -n $from ]]; then
   [[ " ${STEPS[*]} " == *" $from "* ]] || fail "not a step: $from"
 fi
@@ -109,6 +112,17 @@ install_ui() {
 configure() {
   simulated && return
   bash "$work/ui/packages/ui_configuration/install.sh" --user "$user" <"$secrets/token"
+}
+
+# The empty data disks chosen in the page, once the launcher and the user are there: the root code
+# of the launcher checks each disk again before it erases it.
+prepare_disks() {
+  if [[ -z $disks ]]; then
+    echo '@@detail none'
+    return
+  fi
+  simulated && return
+  "$wizard" disks "$disks"
 }
 
 # The account in the database of the gateway, with the identity of the gateway's own unit, so the
@@ -173,6 +187,7 @@ step download_ui download ui
 step install_gateway install_gateway
 step install_ui install_ui
 step configure configure
+step disks prepare_disks
 step account create_account
 step certificate certificate
 step complete complete
