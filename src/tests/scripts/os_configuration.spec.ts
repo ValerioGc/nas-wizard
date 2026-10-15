@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { fakeCommand, OS_CONFIGURATION, run, workspace } from './helpers';
@@ -31,7 +31,9 @@ const outputs = () => join(temp.path, 'drm');
 
 function asRoot(script: string, installed: string[] = [], args: string[] = []) {
   const inventory = join(temp.path, 'dpkg');
-  if (!existsSync(inventory)) writeFileSync(inventory, ['bash', ...installed].join('\n') + '\n');
+  if (!existsSync(inventory)) {
+    writeFileSync(inventory, ['bash', ...installed].join('\n') + '\n');
+  }
   const root = join(temp.path, 'root');
   mkdirSync(join(root, 'etc'), { recursive: true });
   if (!existsSync(join(root, 'etc/hosts'))) {
@@ -94,7 +96,9 @@ esac`,
       args: ['--snapshot'],
       env,
     });
-    if (snapshot.code !== 0) throw new Error(snapshot.output);
+    if (snapshot.code !== 0) {
+      throw new Error(snapshot.output);
+    }
   }
   return run(join(OS_CONFIGURATION, script), { args, env });
 }
@@ -133,7 +137,7 @@ describe('system-packages.sh', () => {
     const { code, output } = systemPackages([], []);
 
     expect(code).not.toBe(0);
-    expect(output).toContain('it has to run as root');
+    expect(output).toContain('run this script as root');
     expect(output).not.toContain('apt-get install');
   });
 
