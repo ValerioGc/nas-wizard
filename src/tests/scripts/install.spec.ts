@@ -96,7 +96,7 @@ describe('install.sh', () => {
     const source = readFileSync(join(ROOT, 'install.sh'), 'utf8');
 
     expect(source).toContain(
-      'cp -a "$packages/os_configuration" "$INSTALLED/packages/os_configuration"',
+      'cp -a "$packages/os_configuration" "$staging/packages/os_configuration"',
     );
   });
 

@@ -12,6 +12,13 @@
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+case ${1:-} in
+  --dry-run|'') ;;
+  *) printf 'error: unknown option: %s\n' "$1" >&2; exit 2 ;;
+esac
+if [[ ${1:-} != --dry-run ]]; then
+  "$here/scripts/uninstall.sh" --snapshot
+fi
 "$here/scripts/system-packages.sh" "$@"
 "$here/scripts/wifi.sh" "$@"
 "$here/scripts/screen.sh" "$@"

@@ -44,6 +44,7 @@ esac
 
 [[ $EUID -eq 0 ]] || fail "it has to run as root: sudo $0"
 [[ -d $configuration ]] || fail "the configuration of the system is missing: $configuration"
+"$configuration/scripts/uninstall.sh" --check
 
 if ! $confirmed; then
   cat <<'TEXT'
@@ -59,13 +60,27 @@ TEXT
   [[ $answer == delete ]] || fail 'cancelled: nothing was removed'
 fi
 
+busy=$(systemctl list-units --plain --no-legend --state=active,activating,deactivating,reloading \
+  'nas-os-reset.service' 'nas-os-update.service' 'nas-os-apt@*.service' 'nas-os-app-packages@*.service' \
+  'nas-os-storage-initialize.service' 'nas-os-storage-rename.service' 'nas-os-storage-eject.service')
+[[ -z $busy ]] || fail 'wait for NAS reset, updates, package installation or disk operations before uninstalling'
+
+say "Stop NAS services"
+for unit in nas-os.service nas-os-gateway.service nas-wizard.service nas-os-storage.timer; do
+  load=$(systemctl show "$unit" --property=LoadState --value)
+  if [[ $load != not-found ]]; then systemctl disable --now "$unit"; fi
+done
+for unit in nas-os-firewall.service nas-os-smb-shares.service nas-os-sync-ports.service nas-os-discovery.service; do
+  load=$(systemctl show "$unit" --property=LoadState --value)
+  if [[ $load != not-found ]]; then systemctl stop "$unit"; fi
+done
+
+say "Base firewall"
+# Prima di qualsiasi purge, quando nft è ancora disponibile.
+"$configuration/scripts/firewall.sh" --remove
+
 say "Token"
-# It restarts the launcher when it is done, which fails once the launcher is gone: not an error.
-if [[ -x $LAUNCHER_TOOLS/launcher-token.sh ]]; then
-  "$LAUNCHER_TOOLS/launcher-token.sh" --clear 2>/dev/null || true
-else
-  echo "   no token helper: the launcher is not installed"
-fi
+rm -f /etc/credstore.encrypted/nas-os.launcher-token
 rmdir /etc/credstore.encrypted 2>/dev/null || true
 
 say "Launcher"
@@ -86,9 +101,6 @@ say "Screen"
 # Before the wizard: its program is the one that watches the monitor.
 "$configuration/scripts/screen.sh" --remove
 
-say "Base firewall"
-"$configuration/scripts/firewall.sh" --remove
-
 say "Wireless check"
 "$configuration/scripts/wifi.sh" --remove
 
@@ -100,7 +112,7 @@ say "Wizard"
 systemctl disable --now nas-wizard.service 2>/dev/null || true
 rm -f -- "$WIZARD_UNIT"
 systemctl daemon-reload
-rm -rf -- "$WIZARD_HOME" "$WIZARD_STATE" "$WIZARD_UPDATES"
+rm -rf -- "$WIZARD_HOME" "$WIZARD_HOME.previous" "$WIZARD_STATE" "$WIZARD_UPDATES"
 echo "   the wizard, its unit and what it downloaded are gone"
 
 say "Done"

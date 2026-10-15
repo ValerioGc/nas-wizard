@@ -27,9 +27,10 @@ case ${1:-} in
     ;;
   --remove)
     [[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root: sudo $0"
-    systemctl disable "$NAME" >/dev/null 2>&1 || true
+    load=$(systemctl show "$NAME" --property=LoadState --value)
+    if [[ $load != not-found ]]; then systemctl disable --now "$NAME"; fi
     rm -f -- "$UNIT" "$RULE" "$CHECK"
-    systemctl unmask --runtime wpa_supplicant.service >/dev/null 2>&1 || true
+    systemctl unmask --runtime wpa_supplicant.service >/dev/null
     systemctl daemon-reload
     udevadm control --reload >/dev/null 2>&1 || true
     echo 'wireless check removed'

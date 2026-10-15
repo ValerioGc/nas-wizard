@@ -59,6 +59,36 @@ async fn run(program: &str, args: &[&str]) -> Option<String> {
         .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
+// Dopo un reset la rete resta quella originale. Prepara il Wi-Fi solo su richiesta esplicita.
+async fn prepare_wifi() -> Result<(), String> {
+    if run("nmcli", &["-t", "general", "status"]).await.is_some() {
+        return Ok(());
+    }
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let home = executable
+        .ancestors()
+        .nth(3)
+        .ok_or("wizard installation directory is missing")?;
+    for relative in ["scripts/system-packages.sh", "files/wifi.sh"] {
+        let script = home.join("packages/os_configuration").join(relative);
+        if !script.is_file() {
+            return Err("the installed wizard's network configuration is missing".to_owned());
+        }
+        let command = Command::new("bash").arg(&script).output();
+        let output = tokio::time::timeout(CONNECT_TIMEOUT, command)
+            .await
+            .map_err(|_| "network preparation timed out".to_owned())?
+            .map_err(|error| error.to_string())?;
+        if !output.status.success() {
+            return Err(format!(
+                "network preparation failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// The fields of a line of `nmcli -t`, which separates with `:` and escapes it with `\` inside a
 /// value: an SSID may hold one.
 pub fn fields(line: &str) -> Vec<String> {
@@ -217,7 +247,16 @@ async fn connection() -> Connection {
 }
 
 pub async fn state(real: bool, rescan: bool) -> Networks {
-    let (wifi, wifi_note) = match scan(rescan).await {
+    let preparation = if real && rescan {
+        prepare_wifi().await
+    } else {
+        Ok(())
+    };
+    let result = match preparation {
+        Ok(()) => scan(rescan).await,
+        Err(reason) => Err(reason),
+    };
+    let (wifi, wifi_note) = match result {
         Ok(found) => (found, None),
         Err(reason) => (Vec::new(), Some(reason)),
     };
@@ -254,6 +293,7 @@ pub async fn join(real: bool, request: &WifiRequest) -> Result<Networks, ApiFail
             "network changes are disabled for this wizard (WIZARD_MODE)",
         ));
     }
+    prepare_wifi().await.map_err(ApiFailure::unavailable)?;
     let interface = device("wifi")
         .await
         .ok_or_else(|| ApiFailure::unavailable("no wireless interface"))?;

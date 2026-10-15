@@ -131,18 +131,32 @@ if $dry_run; then
   unit | sed 's/^/     /'
   exit 0
 fi
-systemctl stop "$UNIT" 2>/dev/null || true
+load=$(systemctl show "$UNIT" --property=LoadState --value)
+if [[ $load != not-found ]]; then systemctl stop "$UNIT"; fi
 # The binary, the interface and the script after the wizard, laid out as in this package: the
 # wizard finds the script three folders above its binary. The configuration of the system too, for
 # the uninstall.sh that stays alone in this folder once the wizard is done.
-rm -rf -- "$INSTALLED"
-install -d -m 0755 "$INSTALLED/packages"
-cp -a "$here/wizard" "$INSTALLED/wizard"
-cp -a "$packages/post_wizard" "$INSTALLED/packages/post_wizard"
-cp -a "$packages/os_configuration" "$INSTALLED/packages/os_configuration"
+install -d -m 0755 "$(dirname "$INSTALLED")"
+staging=$(mktemp -d "$(dirname "$INSTALLED")/.nas-wizard.XXXXXX")
+chmod 0755 "$staging"
+trap 'rm -rf -- "$staging"' EXIT
+install -d -m 0755 "$staging/packages"
+cp -a "$here/wizard" "$staging/wizard"
+cp -a "$packages/post_wizard" "$staging/packages/post_wizard"
+cp -a "$packages/os_configuration" "$staging/packages/os_configuration"
 for manual in "$here"/nas_os_installation_manual_*.pdf; do
-  [[ -f $manual ]] && install -m 0644 "$manual" "$INSTALLED/"
+  [[ -f $manual ]] && install -m 0644 "$manual" "$staging/"
 done
+[[ -x $staging/wizard/bin/nas-wizard ]] || fail 'the new wizard has no executable binary'
+previous=$INSTALLED.previous
+[[ ! -e $previous ]] || fail "previous installation still exists: $previous"
+if [[ -e $INSTALLED ]]; then mv -- "$INSTALLED" "$previous"; fi
+if ! mv -- "$staging" "$INSTALLED"; then
+  if [[ -e $previous ]]; then mv -- "$previous" "$INSTALLED"; fi
+  fail 'the new wizard could not be installed; the previous installation was retained'
+fi
+trap - EXIT
+rm -rf -- "$previous"
 unit >"$UNIT_FILE"
 chmod 0644 "$UNIT_FILE"
 systemctl daemon-reload

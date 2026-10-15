@@ -35,11 +35,16 @@ fail() {
 }
 
 remove() {
-  systemctl disable --now "$WATCHER" "$BROWSER" >/dev/null 2>&1 || true
+  local unit load
+  for unit in "$WATCHER" "$BROWSER"; do
+    load=$(systemctl show "$unit" --property=LoadState --value)
+    if [[ $load != not-found ]]; then systemctl disable --now "$unit"; fi
+  done
   rm -f -- "$UNITS/$WATCHER" "$UNITS/$BROWSER" "$PAM"
   systemctl daemon-reload
   if [[ -z $ROOT ]] && id -u "$USER_NAME" >/dev/null 2>&1; then
-    userdel "$USER_NAME"
+    existed=$("$here/scripts/uninstall.sh" --user-existed "$USER_NAME")
+    if [[ $existed == no ]]; then userdel "$USER_NAME"; fi
   fi
   echo 'screen removed'
 }
@@ -80,11 +85,21 @@ fi
 
 if ((${#missing[@]} > 0)); then
   export DEBIAN_FRONTEND=noninteractive
-  apt-get install -q -y --no-install-recommends "${LOCK_WAIT[@]}" -- "${missing[@]}" ||
-    fail "apt-get could not install ${missing[*]}"
-  apt-get clean || echo 'warning: the downloaded archives could not be removed'
+  before=$(mktemp)
+  trap 'rm -f -- "$before"' EXIT
+  dpkg-query -W -f='${binary:Package}\t${db:Status-Status}\n' |
+    awk '$2 == "installed" { print $1 }' | LC_ALL=C sort -u >"$before"
+  record_packages() {
+    local status=$?
+    "$here/scripts/uninstall.sh" --record-packages "$before" || status=1
+    rm -f -- "$before"
+    exit "$status"
+  }
+  trap record_packages EXIT
   install -d -m 0755 "$STATE"
   printf '%s\n' "${missing[@]}" >>"$STATE/packages"
+  apt-get install -q -y --no-install-recommends "${LOCK_WAIT[@]}" -- "${missing[@]}" ||
+    fail "apt-get could not install ${missing[*]}"
 fi
 
 if [[ -z $ROOT ]] && ! id -u "$USER_NAME" >/dev/null 2>&1; then

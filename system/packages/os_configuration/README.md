@@ -1,109 +1,117 @@
-# Configurazione del sistema operativo
+# Operating system configuration
 
-Da eseguire su Debian 13 appena installato, **prima** che il wizard installi gateway e launcher: lo
-esegue lo script di avvio del pacchetto del wizard (`install.sh` nella radice). Installa
-i pacchetti di sistema mancanti, prepara lo schermo per un monitor collegato al NAS e attiva il
-firewall di base.
+Run on Debian 13 before the wizard installs the gateway and launcher. The package's root
+`install.sh` invokes this step automatically.
 
 ```bash
 sudo ./install.sh
-./install.sh --dry-run      # mostra le operazioni senza applicarle
+./install.sh --dry-run
 ```
 
-| File                         | Scopo                                                      |
-| ---------------------------- | ---------------------------------------------------------- |
-| `install.sh`                 | Il punto di avvio della configurazione                     |
-| `scripts/system-packages.sh` | Installa con `apt-get` i pacchetti di sistema che mancano  |
-| `scripts/screen.sh`          | Prepara lo schermo per un monitor collegato al NAS         |
-| `scripts/wifi.sh`            | Tiene spento `wpa_supplicant` senza una scheda Wi-Fi       |
-| `scripts/firewall.sh`        | Installa e attiva il firewall di base                      |
-| `scripts/uninstall.sh`       | Rimuove i pacchetti che lo script precedente ha installato |
+| Existing script              | Purpose                                                      |
+| ---------------------------- | ------------------------------------------------------------ |
+| `install.sh`                 | Saves the original state, then prepares the operating system |
+| `scripts/system-packages.sh` | Installs missing NAS dependencies                            |
+| `scripts/screen.sh`          | Prepares an optional directly connected display              |
+| `scripts/wifi.sh`            | Disables wpa_supplicant while no wireless adapter exists     |
+| `scripts/firewall.sh`        | Installs or removes the NAS firewall                         |
+| `scripts/uninstall.sh`       | Saves, checks and restores the original system configuration |
 
-## I pacchetti
+## Original system state
 
-| Pacchetto         | A cosa serve                                                                   |
-| ----------------- | ------------------------------------------------------------------------------ |
-| `polkitd`         | Concede al launcher solo le sue azioni: riavvio, rete, avvio delle sue unità   |
-| `nftables`        | Trasforma l'elenco degli indirizzi ammessi in un filtro davanti a tutto il NAS |
-| `network-manager` | Cerca le reti Wi-Fi e si collega a una di esse dall'interfaccia                |
-| `wpasupplicant`   | Si collega alle reti Wi-Fi per NetworkManager, spento senza una scheda Wi-Fi   |
-| `wireless-regdb`  | Le regole radio del paese, per le schede Wi-Fi                                 |
-| `parted`          | Prepara i dischi dati vuoti scelti in nas-disk-manager, con `e2fsprogs`        |
-| `smartmontools`   | Legge lo stato di salute dei dischi per nas-disk-manager                       |
+Before any installation changes, `scripts/uninstall.sh --snapshot` saves the original hostname,
+`/etc/hosts`, `/etc/machine-info`, resolver configuration, network configuration directories,
+Samba configuration and account databases. It also records the original installed packages,
+APT automatic/manual marks, system users and groups, network/Samba service states, NAS storage
+mount points and the RTC wake alarm when available.
+ClamAV configuration and its service overrides are saved too. Samba/ClamAV data, cache and log
+directories are recorded without copying their contents: removal deletes these directories only
+if they were absent before installation. Existing package data and shared system logs are preserved.
 
-Si installano senza i pacchetti consigliati: `network-manager` porterebbe con sé ModemManager e
-`ppp`, che a un NAS non servono. NetworkManager non prende in carico le interfacce già dichiarate in
-`/etc/network/interfaces`: una macchina raggiunta via SSH non perde la connessione mentre lo si
-installa.
+The archive is stored in `/var/lib/nas-os-configuration/original`, accessible only to root.
+`original-ready` is written only after capture completes. Updates and repeated installations
+reuse this initial archive; they never replace it with the already configured NAS state.
 
-Poi lo script rimuove ModemManager, BlueZ e cron, se ci sono, ciascuno solo quando
-`apt-get -s purge` dice che con lui non se ne andrebbe nient'altro: un desktop che ne usa uno lo
-tiene, senza trattenere gli altri. Su Debian 13 i lavori periodici del sistema (log, apt, man-db,
-dpkg, fstrim) girano con i timer di systemd e nas-os non usa cron; cron resta comunque se un
-utente ha un crontab (`/var/spool/cron/crontabs`) o se in `/etc/cron.d` o `/etc/cron.<periodo>`
-c'è un lavoro che nessun pacchetto ha installato. Per riaverlo: `sudo apt install cron`. Finisce con
-`apt-get autoremove --purge` e `apt-get clean`; una pulizia che non riesce è un avviso, non un
-errore.
+An installation that predates this backup cannot reconstruct its original configuration.
+Installation updates, exact reset and removal refuse to invent a baseline. Recover a VM snapshot
+or the original Debian configuration first; do not manually create the ready marker or capture
+an already configured NAS as its original state.
 
-## Wi-Fi
+## Packages
 
-`scripts/wifi.sh` installa `/usr/local/lib/nas-os-configuration/wifi.sh`, l'unità
-`nas-os-wifi.service` che lo esegue a ogni avvio prima di NetworkManager e la regola udev
-`80-nas-os-wifi.rules` che lo esegue quando compare una scheda Wi-Fi. Senza schede wireless
-(`/sys/class/net/*/wireless`) maschera `wpa_supplicant.service` con `--runtime`, cioè solo in
-`/run` fino al riavvio; con una scheda lo smaschera e lo avvia. Il pacchetto resta installato.
-`scripts/wifi.sh --remove` toglie tutto e lascia `wpa_supplicant` com'era.
+The NAS installs only missing dependencies, without recommended packages:
 
-## Schermo
+| Package               | Purpose                                           |
+| --------------------- | ------------------------------------------------- |
+| `polkitd`             | Authorizes the launcher's specific system actions |
+| `nftables`            | Applies NAS firewall tables                       |
+| `network-manager`     | Discovers and joins wireless networks             |
+| `wpasupplicant`       | Connects to wireless networks                     |
+| `wireless-regdb`      | Supplies wireless regulatory data                 |
+| `parted`, `e2fsprogs` | Initializes explicitly selected data disks        |
+| `smartmontools`       | Reads disk health                                 |
 
-Su una macchina con un'uscita video (`/sys/class/drm/card*`) `scripts/screen.sh` installa `cog`
-senza i pacchetti consigliati (WebKit disegna la pagina direttamente sullo schermo con DRM/KMS,
-senza server grafico) e lo annota con gli altri pacchetti. Crea l'utente `nas-screen` (gruppi
-`video`, `input` e `render`, senza password né shell), il servizio PAM della sua sessione
-(`/etc/pam.d/nas-os-screen`) e due unità:
+Pre-existing packages, including cron, Bluetooth and modem support, are preserved. The installers
+record packages and dependencies added by the NAS, including partial failed installations.
+They do not run a global `autoremove` or clear the machine's package cache. APT index refresh
+errors stop installation before downloads are attempted against stale indexes.
 
-- `nas-os-screen.service`, spenta finché non la si attiva con
-  `sudo systemctl enable --now nas-os-screen.service`: esegue `nas-wizard screen` come root, senza
-  capability né rete. Pochi MB: guarda le uscite video, le tastiere e i mouse;
-- `nas-os-screen-browser.service`: `cog` come `nas-screen` in una sessione propria su tty1, avviata
-  solo quando un monitor è collegato (HDMI, DisplayPort, DVI, VGA) e fermata quando si scollega o
-  dopo i minuti senza uso delle impostazioni di alimentazione (10 senza scelta), con lo schermo che
-  si spegne e il monitor in standby. Al primo tasto riparte. I suoi dati stanno nella cartella di
-  runtime e si perdono a ogni arresto: si accede ogni volta con la password. Gira solo mentre tty1
-  è la console in primo piano: Ctrl+Alt+F2 (fino a F6) lo ferma e lascia lo schermo al login
-  testuale di quel terminale, Ctrl+Alt+F1 lo riporta.
+Removal simulates its purge first and refuses to remove any package present before the NAS.
+Only recorded NAS additions are purged; original APT marks are restored.
+Debian package upgrades remain allowed. Restoration returns the saved configuration and service
+states, but does not downgrade pre-existing packages to their original versions.
 
-Il browser aspetta che `127.0.0.1:8081` risponda e lo apre: prima della configurazione il wizard,
-poi il gateway, che su quella porta non chiede il certificato del dispositivo (mTLS). `scripts/screen.sh --remove` toglie unità, file e utente; `cog` va via con gli
-altri pacchetti.
+## Wireless networking and display
+
+The wireless helper is installed as `nas-os-wifi.service` and an adapter udev rule. Without a
+wireless adapter it masks `wpa_supplicant.service` only for the current boot. Restoration returns
+the service to its recorded state rather than assuming it was previously enabled.
+
+A machine with a video output can use `cog` on a directly connected display. The watcher
+`nas-os-screen.service` remains disabled until explicitly enabled. The browser runs as
+`nas-screen` and accesses the loopback display port 8081. Removal deletes that user only when
+it did not exist before the NAS.
 
 ## Firewall
 
-La tabella nftables `nas_base` blocca per impostazione predefinita ingresso, inoltro e uscita.
-Sono ammessi il wizard e il redirect del gateway su TCP 80, il gateway HTTPS su TCP 443, SSH TCP 22 da indirizzi privati o link-local, il traffico di
-risposta, loopback, DHCP, DNS, NTP e ICMP. `root`, `_apt` e `nas-os` possono usare HTTP e HTTPS per
-gli aggiornamenti. Le applicazioni avviate da `nas-app@.service` possono usare HTTP e HTTPS; il
-template registra i loro cgroup nell'insieme `nas_apps_out`. Le applicazioni a cui il launcher
-concede la rete `smtp` (`permissions.network` nel manifest) sono anche nell'insieme `nas_apps_smtp`
-e possono usare TCP 25, 465 e 587 per inviare posta. Altre porte in uscita sono bloccate.
-La porta TCP 8081 sul loopback, quella dello schermo, accetta solo i processi dell'utente
-`nas-screen`: nessun altro processo della macchina può aggirare il certificato del dispositivo.
-Le cartelle condivise in rete (SMB) passano dall'insieme di porte `nas_shares`, aperto solo agli
-indirizzi privati o link-local: è vuoto, e la porta 445 chiusa, finché il launcher non vi mette la
-445 mentre almeno una cartella è condivisa; la svuota quando non ce n'è più nessuna.
-La sincronizzazione con i PC passa dall'insieme `nas_sync`, aperto solo agli indirizzi privati o
-link-local e vuoto finché il launcher non vi mette le porte di Syncthing (TCP e UDP 22000, UDP 21027)
-mentre una sync è attiva. In uscita l'app della sync (insieme di cgroup `nas_apps_sync`) raggiunge
-solo la rete locale su quelle porte, più il broadcast e il multicast della scoperta locale.
-La lista degli indirizzi ammessi del launcher applica un secondo filtro in ingresso.
+`nas_base` supplies the NAS input, output and forwarding policy. It permits the gateway/wizard
+web ports, local SSH, established traffic, loopback, DHCP, DNS, NTP and ICMP. Outbound HTTP/HTTPS
+is allowed for root, APT, the launcher and authorized application cgroups. Application grants
+control SMTP and sync access. Dynamic sets control shared folders, sync and NAS discovery.
 
-Le regole sono caricate all'avvio da `nas-os-base-firewall.service`. L'installazione attiva subito
-il filtro: una sessione SSH da un indirizzo pubblico perderà la connessione. Configurare prima
-un accesso dalla rete privata e verificare le porte richieste dalle applicazioni in uso. Per
-ispezionare le regole: `sudo nft list table inet nas_base`. Per rimuoverle:
-`sudo scripts/firewall.sh --remove`.
+`nas_launcher` is the separate allowed-address filter. Firewall removal deletes both NAS tables
+before any package purge can remove `nft`. Inspection or deletion errors are failures, not proof
+that no filter exists. Other nftables tables are left intact.
 
-## Tornare indietro
+The base service loads its own rules and does not activate the distribution's independent
+`nftables.service`.
 
-`scripts/system-packages.sh` annota in `/var/lib/nas-os-configuration/packages` i pacchetti che ha
-installato davvero. `../uninstall.sh` rimuove launcher e gateway, poi il firewall e infine solo quei pacchetti.
+## Reset and removal
+
+The settings reset keeps the wizard and its required operating-system support. It stops the NAS
+services, storage timer and storage udev trigger, removes the allowed-address filter and wireless helper, clears dynamic grants,
+removes NAS application packages, restores the original hostname/network/Samba configuration
+and service states, and removes NAS account/application data, binaries and service units for the
+launcher and gateway. It also removes stale NAS sockets, lock files and downloaded wizard updates.
+Only mount points introduced by
+the NAS are unmounted; data files are not deleted. Both NAS firewall tables are removed, leaving
+the original firewall policy in place. The wizard is enabled for subsequent boots. When a new
+installation is confirmed, the existing post-wizard installer prepares NAS operating-system
+support and the base firewall again before downloading the gateway.
+
+The complete `../uninstall.sh` additionally removes the wizard, display, wireless helper and NAS
+system packages. It restores the original service states and removes only users/groups created
+by the NAS. The initial backup is deleted only after successful restoration.
+
+Both reset and complete removal delete the Linux terminal user created by the wizard, including
+its home. The Debian administrator `nas` is explicitly excluded from user removal. Other users
+recorded before installation are preserved too.
+
+The NAS name and IP address may change back during restoration. Reopen setup using the restored
+address if the browser loses its connection. A failed operation retains the original archive
+and reports failure; it must not print that the machine was restored successfully.
+
+Starting the wizard after a reset does not reactivate NetworkManager if it was originally stopped
+or absent. An explicit Wi-Fi scan or connection request prepares network support through the
+existing package and wireless helpers. This allows wireless setup without changing the restored
+network merely because the wizard started.

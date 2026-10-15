@@ -25,9 +25,19 @@ case ${1:-} in
     ;;
   --remove)
     [[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root: sudo $0"
-    systemctl disable --now "$NAME" >/dev/null 2>&1 || true
-    if command -v nft >/dev/null && nft list table inet nas_base >/dev/null 2>&1; then
-      nft delete table inet nas_base
+    if command -v nft >/dev/null; then
+      tables=$(nft list tables) || fail 'cannot inspect nftables rules'
+      for table in nas_launcher nas_base; do
+        if grep -qxF "table inet $table" <<<"$tables"; then
+          nft delete table inet "$table" || fail "cannot remove $table"
+        fi
+      done
+    elif [[ -e $UNIT || -e $LOADER ]]; then
+      fail 'nft is missing: removal of the installed NAS firewall cannot be verified'
+    fi
+    load=$(systemctl show "$NAME" --property=LoadState --value)
+    if [[ $load != not-found ]]; then
+      systemctl disable --now "$NAME" || fail 'cannot stop the base firewall'
     fi
     rm -f "$UNIT" "$LOADER"
     rmdir "$(dirname "$LOADER")" 2>/dev/null || true

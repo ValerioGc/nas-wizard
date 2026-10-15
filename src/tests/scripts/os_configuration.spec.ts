@@ -30,23 +30,73 @@ const state = () => join(temp.path, 'state');
 const outputs = () => join(temp.path, 'drm');
 
 function asRoot(script: string, installed: string[] = [], args: string[] = []) {
+  const inventory = join(temp.path, 'dpkg');
+  if (!existsSync(inventory)) writeFileSync(inventory, ['bash', ...installed].join('\n') + '\n');
+  const root = join(temp.path, 'root');
+  mkdirSync(join(root, 'etc'), { recursive: true });
+  if (!existsSync(join(root, 'etc/hosts'))) {
+    writeFileSync(join(root, 'etc/hosts'), '127.0.0.1 localhost\n127.0.1.1 debian\n');
+    writeFileSync(join(root, 'etc/hostname'), 'debian\n');
+  }
   fakeCommand(
     temp.path,
     'dpkg-query',
-    `case " ${installed.join(' ')} " in *" \${@: -1} "*) printf 'install ok installed' ;; *) exit 1 ;; esac`,
+    `if (($# == 2)); then awk 'NF { print $0 "\\tinstalled" }' ${JSON.stringify(inventory)}; else grep -qxF -- "\${@: -1}" ${JSON.stringify(inventory)} && printf 'install ok installed'; fi`,
   );
-  fakeCommand(temp.path, 'apt-get', `printf 'apt-get %s\\n' "$*"`);
-  fakeCommand(temp.path, 'systemctl', `printf 'systemctl %s\\n' "$*"`);
+  fakeCommand(
+    temp.path,
+    'apt-get',
+    `printf 'apt-get %s\\n' "$*"
+action=$1
+[[ $action == -s ]] && exit 0
+if [[ $action == install || $action == purge ]]; then
+  while (($#)) && [[ $1 != -- ]]; do shift; done
+  shift
+  for package in "$@"; do
+    if [[ $action == install ]]; then printf '%s\\n' "$package" >> ${JSON.stringify(inventory)};
+    else grep -vxF -- "$package" ${JSON.stringify(inventory)} > ${JSON.stringify(inventory + '.new')} || true; mv ${JSON.stringify(inventory + '.new')} ${JSON.stringify(inventory)}; fi
+  done
+fi`,
+  );
+  fakeCommand(
+    temp.path,
+    'systemctl',
+    `case $1 in
+show) echo loaded ;;
+is-enabled) echo disabled; exit 1 ;;
+is-active) echo inactive; exit 3 ;;
+*) printf 'systemctl %s\\n' "$*" ;;
+esac`,
+  );
+  fakeCommand(temp.path, 'hostname', 'echo debian');
+  fakeCommand(temp.path, 'hostnamectl', `printf 'hostnamectl %s\\n' "$*"`);
+  fakeCommand(
+    temp.path,
+    'getent',
+    'if [[ $1 == passwd ]]; then echo root:x:0:0:root:/root:/bin/bash; elif [[ $1 == group && $# == 1 ]]; then echo root:x:0:; else exit 2; fi',
+  );
+  fakeCommand(temp.path, 'apt-mark', 'exit 0');
+  fakeCommand(temp.path, 'findmnt', 'exit 0');
+  fakeCommand(
+    temp.path,
+    'nft',
+    'if [[ $* == "list tables" ]]; then exit 0; elif [[ $1 == list ]]; then exit 1; elif [[ $1 == -f ]]; then cat >/dev/null; fi',
+  );
   fakeCommand(temp.path, 'udevadm', `printf 'udevadm %s\\n' "$*"`);
-  return run(join(OS_CONFIGURATION, script), {
-    args,
-    env: {
-      NAS_CONFIGURATION_STATE: state(),
-      NAS_CONFIGURATION_ROOT: join(temp.path, 'root'),
-      NAS_CONFIGURATION_DRM: outputs(),
-      PATH: `${temp.path}:${process.env.PATH}`,
-    },
-  });
+  const env = {
+    NAS_CONFIGURATION_STATE: state(),
+    NAS_CONFIGURATION_ROOT: root,
+    NAS_CONFIGURATION_DRM: outputs(),
+    PATH: `${temp.path}:${process.env.PATH}`,
+  };
+  if (script !== 'scripts/uninstall.sh' && !existsSync(join(state(), 'original-ready'))) {
+    const snapshot = run(join(OS_CONFIGURATION, 'scripts/uninstall.sh'), {
+      args: ['--snapshot'],
+      env,
+    });
+    if (snapshot.code !== 0) throw new Error(snapshot.output);
+  }
+  return run(join(OS_CONFIGURATION, script), { args, env });
 }
 
 describe('system-packages.sh', () => {
@@ -95,148 +145,52 @@ describe('system-packages.sh', () => {
   });
 });
 
-describe('what a NAS has no use for', () => {
-  const all = [
-    'polkitd',
-    'nftables',
-    'network-manager',
-    'wpasupplicant',
-    'wireless-regdb',
-    'parted',
-    'e2fsprogs',
-    'smartmontools',
-  ];
-
-  /** apt-get, whose simulated purge takes away the packages named and `extra`. */
-  function apt(extra = '') {
-    fakeCommand(
-      temp.path,
-      'apt-get',
-      `if [[ $1 == -s ]]; then
-  shift; while [[ $1 != -- ]]; do shift; done; shift
-  for name in "$@" ${extra}; do printf 'Purg %s [1.0]\\n' "$name"; done
-else
-  printf 'apt-get %s\\n' "$*"
-fi`,
-    );
-  }
-
-  /** The jobs of cron on the machine: the files named, and whether a package installed each. */
-  function cron(jobs: Record<string, boolean> = {}) {
-    const root = join(temp.path, 'cron');
-    for (const [path, packaged] of Object.entries(jobs)) {
-      mkdirSync(join(root, path, '..'), { recursive: true });
-      writeFileSync(join(root, path), packaged ? 'packaged' : 'by hand');
-    }
-    return root;
-  }
-
-  function packages(installed: string[], cronRoot = cron()) {
-    // `-S` names the package of a file: those written "packaged" have one.
-    fakeCommand(
-      temp.path,
-      'dpkg-query',
-      `if [[ $1 == -S ]]; then grep -qx packaged "${'$'}{NAS_CRON_ROOT}$2"; exit; fi
-case " ${installed.join(' ')} " in *" \${@: -1} "*) printf 'install ok installed' ;; *) exit 1 ;; esac`,
-    );
-    return run(join(OS_CONFIGURATION, 'scripts/system-packages.sh'), {
-      env: {
-        NAS_CONFIGURATION_STATE: state(),
-        NAS_CRON_ROOT: cronRoot,
-        PATH: `${temp.path}:${process.env.PATH}`,
-      },
-    });
-  }
-
-  it('purges ModemManager and BlueZ when nothing else goes with them, then cleans up', () => {
-    apt();
-    const { code, stdout } = packages([...all, 'modemmanager', 'bluez']);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain(
-      'apt-get purge -q -y -o DPkg::Lock::Timeout=600 -- modemmanager bluez',
-    );
-    expect(stdout).toContain('removed, a NAS has no use for them: modemmanager bluez');
-    expect(stdout).not.toContain('apt-get install');
-    expect(stdout).toContain('apt-get autoremove --purge');
-    expect(stdout).toContain('apt-get clean');
-  });
-
-  it('keeps them when removing them would take a desktop away too', () => {
-    apt('gnome-bluetooth');
-    const { code, stdout } = packages([...all, 'bluez']);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain('kept bluez: removing them would take away other packages too');
-    expect(stdout).not.toContain('apt-get purge');
-  });
-
-  it('purges cron, whose work the timers of systemd do, unless it has jobs of its own', () => {
-    apt();
-    const idle = packages([...all, 'cron'], cron({ 'etc/cron.daily/dpkg': true }));
-    expect(idle.stdout).toContain('apt-get purge -q -y -o DPkg::Lock::Timeout=600 -- cron');
-    expect(idle.stdout).toContain('removed, a NAS has no use for them: cron');
-
-    const jobSets: Array<Record<string, boolean>> = [
-      { 'var/spool/cron/crontabs/valerio': false },
-      { 'etc/cron.d/backup-by-hand': false },
-      { 'etc/cron.weekly/report': false },
+describe('pre-existing system configuration', () => {
+  it('keeps pre-existing packages and does not run a global autoremove or clean', () => {
+    const installed = [
+      'polkitd',
+      'nftables',
+      'network-manager',
+      'wpasupplicant',
+      'wireless-regdb',
+      'parted',
+      'e2fsprogs',
+      'smartmontools',
+      'cron',
+      'bluez',
     ];
-    for (const jobs of jobSets) {
-      const busy = packages([...all, 'cron'], cron(jobs));
-      expect(busy.stdout, Object.keys(jobs)[0]).toContain('kept cron: it has jobs of its own');
-      expect(busy.stdout).not.toContain('apt-get purge');
-      rmSync(join(temp.path, 'cron'), { recursive: true, force: true });
-    }
+    const result = asRoot('scripts/system-packages.sh', installed);
+    expect(result.code).toBe(0);
+    expect(result.stdout).not.toContain('apt-get purge');
+    expect(result.stdout).not.toContain('apt-get autoremove');
+    expect(result.stdout).not.toContain('apt-get clean');
   });
 
-  it('weighs each package alone: one a desktop needs does not keep the others', () => {
-    fakeCommand(
-      temp.path,
-      'apt-get',
-      `if [[ $1 == -s ]]; then
-  printf 'Purg %s [1.0]\\n' "${'$'}{@: -1}"
-  if [[ ${'$'}{@: -1} == bluez ]]; then printf 'Purg gnome-bluetooth [1.0]\\n'; fi
-else
-  printf 'apt-get %s\\n' "$*"
-fi`,
-    );
-    const { code, stdout } = packages([...all, 'modemmanager', 'bluez', 'cron']);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain('kept bluez: removing them would take away other packages too');
-    expect(stdout).toContain('apt-get purge -q -y -o DPkg::Lock::Timeout=600 -- modemmanager cron');
+  it('restores hostname and hosts exactly, and keeps the initial copy across another install', () => {
+    expect(asRoot('install.sh', ['polkitd']).code).toBe(0);
+    const root = join(temp.path, 'root');
+    const initial = '127.0.0.1 localhost\n127.0.1.1 debian\n';
+    writeFileSync(join(root, 'etc/hostname'), 'nas-valerio\n');
+    writeFileSync(join(root, 'etc/hosts'), '127.0.1.1 nas-valerio\n');
+    expect(asRoot('install.sh').code).toBe(0);
+    const restored = asRoot('scripts/uninstall.sh', [], ['--restore']);
+    expect(restored.code).toBe(0);
+    expect(readFileSync(join(root, 'etc/hostname'), 'utf8')).toBe('debian\n');
+    expect(readFileSync(join(root, 'etc/hosts'), 'utf8')).toBe(initial);
+    expect(restored.stdout).toContain('hostnamectl --transient hostname debian');
+    expect(existsSync(join(state(), 'original-ready'))).toBe(true);
   });
 
-  it('keeps a package whose purge apt cannot even simulate', () => {
-    fakeCommand(
-      temp.path,
-      'apt-get',
-      `if [[ $1 == -s ]]; then exit 100; fi
-printf 'apt-get %s\\n' "$*"`,
-    );
-    const { code, stdout } = packages([...all, 'cron']);
-
-    expect(code).toBe(0);
-    expect(stdout).toContain('kept cron: removing them would take away other packages too');
-    expect(stdout).not.toContain('apt-get purge');
-  });
-
-  it('says what it would remove in a dry run, and removes nothing', () => {
-    apt();
-    fakeCommand(
-      temp.path,
-      'dpkg-query',
-      `case " ${[...all, 'modemmanager'].join(' ')} " in *" \${@: -1} "*) printf 'install ok installed' ;; *) exit 1 ;; esac`,
-    );
-    const { code, stdout } = run(join(OS_CONFIGURATION, 'scripts/system-packages.sh'), {
-      args: ['--dry-run'],
-      env: { PATH: `${temp.path}:${process.env.PATH}` },
+  it('refuses to invent an original configuration for an installation without a backup', () => {
+    const root = join(temp.path, 'root');
+    mkdirSync(join(root, 'etc/systemd/system'), { recursive: true });
+    writeFileSync(join(root, 'etc/systemd/system/nas-os.service'), '[Service]\n');
+    const result = run(join(OS_CONFIGURATION, 'scripts/uninstall.sh'), {
+      args: ['--snapshot'],
+      env: { NAS_CONFIGURATION_ROOT: root, NAS_CONFIGURATION_STATE: state() },
     });
-
-    expect(code).toBe(0);
-    expect(stdout).toContain('[dry run] apt-get purge modemmanager');
-    expect(stdout).not.toContain('apt-get purge -q');
+    expect(result.code).not.toBe(0);
+    expect(existsSync(join(state(), 'original-ready'))).toBe(false);
   });
 });
 
@@ -306,11 +260,19 @@ describe('removing what the configuration installed', () => {
     expect(stdout).toContain(
       'apt-get install -q -y --no-install-recommends -o DPkg::Lock::Timeout=600 -- nftables network-manager wpasupplicant wireless-regdb parted e2fsprogs smartmontools',
     );
-    expect(stdout).toContain('apt-get autoremove --purge -q -y -o DPkg::Lock::Timeout=600');
-    expect(stdout).toContain('apt-get clean');
+    expect(stdout).not.toContain('apt-get autoremove');
+    expect(stdout).not.toContain('apt-get clean');
     expect(stdout).toContain('systemctl enable nas-os-base-firewall.service');
-    expect(readFileSync(join(state(), 'packages'), 'utf8')).toBe(
-      'nftables\nnetwork-manager\nwpasupplicant\nwireless-regdb\nparted\ne2fsprogs\nsmartmontools\n',
+    expect(new Set(readFileSync(join(state(), 'packages'), 'utf8').trim().split('\n'))).toEqual(
+      new Set([
+        'nftables',
+        'network-manager',
+        'wpasupplicant',
+        'wireless-regdb',
+        'parted',
+        'e2fsprogs',
+        'smartmontools',
+      ]),
     );
     expect(
       readFileSync(
@@ -321,22 +283,23 @@ describe('removing what the configuration installed', () => {
   });
 
   it('removes those packages, once each, and nothing that is not a package name', () => {
-    mkdirSync(state());
+    expect(asRoot('install.sh', ['polkitd']).code).toBe(0);
     writeFileSync(join(state(), 'packages'), 'nftables\nnftables\n; rm -rf /\nnetwork-manager\n');
 
     const { code, stdout } = asRoot('scripts/uninstall.sh');
 
     expect(code).toBe(0);
-    expect(stdout).toContain('apt-get purge -q -y --autoremove -- network-manager nftables');
+    expect(stdout).toContain(
+      'apt-get purge -q -y -o DPkg::Lock::Timeout=600 -- network-manager nftables',
+    );
     expect(stdout).not.toContain('rm -rf');
     expect(existsSync(state())).toBe(false);
   });
 
-  it('removes nothing when it installed nothing', () => {
+  it('refuses removal without the original system state', () => {
     const { code, stdout } = asRoot('scripts/uninstall.sh');
 
-    expect(code).toBe(0);
-    expect(stdout).toContain('nothing to remove');
+    expect(code).not.toBe(0);
     expect(stdout).not.toContain('apt-get');
   });
 });
@@ -364,7 +327,9 @@ describe('screen.sh', () => {
     );
     expect(stdout).not.toContain('systemctl enable nas-os-screen.service');
     expect(stdout).toContain('screen installed and off');
-    expect(readFileSync(join(state(), 'packages'), 'utf8')).toBe('cog\nlibgles2\n');
+    expect(new Set(readFileSync(join(state(), 'packages'), 'utf8').trim().split('\n'))).toEqual(
+      new Set(['cog', 'libgles2']),
+    );
     const watcher = readFileSync(root('etc/systemd/system/nas-os-screen.service'), 'utf8');
     expect(watcher).toContain('ExecStart=/usr/local/lib/nas-wizard/wizard/bin/nas-wizard screen');
     const browser = readFileSync(root('etc/systemd/system/nas-os-screen-browser.service'), 'utf8');
@@ -541,13 +506,13 @@ describe('uninstall.sh', () => {
   it('undoes what the wizard did in the reverse order it did it', () => {
     const script = readFileSync(join(OS_CONFIGURATION, '..', 'uninstall.sh'), 'utf8');
     const order = [
-      'launcher-token.sh" --clear',
+      '$configuration/scripts/firewall.sh" --remove',
+      'rm -f /etc/credstore.encrypted/nas-os.launcher-token',
       '$LAUNCHER_TOOLS/uninstall.sh" --purge',
       '$GATEWAY_TOOLS/uninstall.sh" --purge',
       '$configuration/scripts/screen.sh" --remove',
-      '$configuration/scripts/firewall.sh" --remove',
       '$configuration/scripts/wifi.sh" --remove',
-      '$configuration/scripts/uninstall.sh"',
+      '$configuration/scripts/uninstall.sh"\n',
       'rm -rf -- "$WIZARD_HOME"',
     ].map((step) => script.indexOf(step));
 
