@@ -91,8 +91,8 @@ simulated() {
 download() {
   local which=$1 version
   if [[ $which == gateway ]] && ! $simulate; then
-    # Dopo un reset il wizard gira con la rete originale; prepara di nuovo il NAS solo
-    # quando l'utente conferma una nuova installazione.
+    # After a reset the wizard runs on the original network: the NAS is prepared again only
+    # when a new installation is confirmed.
     bash "$here/../os_configuration/install.sh"
   fi
   version=$(WIZARD_TOKEN_PATH=$secrets/token "$wizard" fetch "$which" --into "$work/$which")

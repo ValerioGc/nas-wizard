@@ -81,8 +81,21 @@ const props = withDefaults(defineProps<Props>(), { description: undefined, logo:
   margin-bottom: $space_4;
 }
 
+// Back at the start of the row, forward at its end; the first page has only its centered start.
 .wizard_actions {
+  justify-content: space-between;
+
+  :slotted(button:last-child) {
+    margin-left: auto;
+  }
+}
+
+.wizard_step_intro .wizard_actions {
   justify-content: center;
+
+  :slotted(button:last-child) {
+    margin-left: 0;
+  }
 }
 
 </style>

@@ -15,7 +15,7 @@
 # NetworkManager leaves alone the interfaces already declared in /etc/network/interfaces, so a
 # machine reached over SSH keeps its connection while it is installed.
 #
-# I pacchetti e le cache presenti prima del NAS non vengono rimossi.
+# Packages and caches present before the NAS are never removed.
 #
 # What it installs is written down in /var/lib/nas-os-configuration/packages, so that
 # scripts/uninstall.sh removes those and leaves alone the ones that were already there.
@@ -80,14 +80,14 @@ if ((${#missing[@]} == 0)); then
 else
   apt-get update -q -o APT::Update::Error-Mode=any "${LOCK_WAIT[@]}" || fail 'the package index could not be refreshed'
   install -d -m 0755 "$STATE"
-  # Registra prima dell'installazione, anche se apt si interrompe a metà.
+  # Recorded before the install, in case apt stops halfway.
   printf '%s\n' "${missing[@]}" >>"$STATE/packages"
   apt-get install -q -y --no-install-recommends "${LOCK_WAIT[@]}" -- "${missing[@]}" ||
     fail "apt-get could not install ${missing[*]}"
   printf 'installed: %s\n' "${missing[*]}"
 fi
 
-# Dopo un reset i pacchetti possono essere ancora presenti ma la configurazione no.
+# After a reset the packages may still be there while their configuration is not.
 if [[ ! -f $ROOT/etc/NetworkManager/NetworkManager.conf ]]; then
   install -d -m 0755 "$ROOT/etc/NetworkManager"
   cat >"$ROOT/etc/NetworkManager/NetworkManager.conf" <<'CONFIG'

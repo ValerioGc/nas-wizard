@@ -9,6 +9,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The removal of the NAS and the factory reset keep a package the NAS installed when an upgrade of
+  Debian made a package that was already there depend on it, at the version it has, instead of
+  stopping. They unmount and close the encrypted data disks the NAS opened before removing the
+  packages, and `wifi.sh --remove` leaves no empty `/usr/local/lib/nas-os-configuration`. The
+  unit of the wizard runs with two workers and two memory arenas. Untested on a machine.
+
 - The texts of the interface, in Italian and English, are impersonal and shorter: no ellipsis,
   colon or semicolon, no names of commands or services. The messages of the entry script at its
   end say where the configuration page is without telling to open it.

@@ -12,6 +12,7 @@ import CommonSpinner from '@/components/commons/CommonSpinner.vue';
 import lanIcon from '@/assets/icons/network/lan.svg';
 import lockIcon from '@/assets/icons/network/lock.svg';
 import wifiIcon from '@/assets/icons/network/wifi.svg';
+import wifiOffIcon from '@/assets/icons/network/wifi_off.svg';
 import refreshIcon from '@/assets/icons/system/refresh.svg';
 import { failureMessage } from '@/utils/failureMessage';
 
@@ -112,8 +113,13 @@ onMounted(scan);
     <template v-else>
       <p v-if="error" role="alert" class="app_error">{{ error }}</p>
       <p v-if="state && !state.canConnect" class="muted">{{ t('wizardNetworkFixed') }}</p>
-      <p v-if="state && !state.wifi.length" class="muted">
-        {{ state.wifiNote ?? t('noNetworks') }}
+      <p
+        v-if="state && !state.wifi.length"
+        class="wizard_network_empty"
+        data-testid="wizard_network_note"
+      >
+        <CommonIcon :src="wifiOffIcon" />
+        <span>{{ state.wifiNote ? t(`wifiNote_${state.wifiNote}`) : t('noNetworks') }}</span>
       </p>
 
       <ul v-if="state?.wifi.length" class="app_list">
@@ -185,6 +191,15 @@ onMounted(scan);
   @extend %fx_base;
   gap: $space_2;
   min-height: $space_10;
+}
+
+.wizard_network_empty {
+  @extend %panel_sunken;
+  @extend %fx_base;
+  gap: $space_3;
+  margin: 0;
+  padding: $space_3 $space_4;
+  color: var(--surface-muted);
 }
 
 .wizard_network_scan {

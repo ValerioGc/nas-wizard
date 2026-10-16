@@ -12,7 +12,7 @@ export default {
   loading: 'Caricamento in corso',
   networkPassword: 'Password di rete',
   next: 'Avanti',
-  noNetworks: 'Nessuna rete Wi-Fi trovata.',
+  noNetworks: 'Nessuna rete Wi-Fi trovata',
   passwordLabel: 'Password',
   passwordMismatch: 'Le due password non coincidono.',
   requestFailed: 'Operazione non riuscita. Il NAS non ha risposto.',
@@ -42,9 +42,12 @@ export default {
   nasName: 'Nome del NAS',
   nasNameInvalid:
     'Fino a 63 caratteri tra lettere, numeri e trattini, senza trattino iniziale o finale.',
-  wizardNetworkTitle: 'Rete Wi-Fi',
+  wizardNetworkTitle: 'Connessione di rete',
   wizardNetworkIntro:
-    'Rete Wi-Fi a cui collegare il NAS. Con una connessione via cavo il passaggio è facoltativo.',
+    'Connessione del NAS alla rete locale, via cavo o Wi-Fi. Con il cavo collegato il Wi-Fi è facoltativo.',
+  wifiNote_noDevice: 'Nessun dispositivo Wi-Fi rilevato sul NAS',
+  wifiNote_noNetworkManager: 'Gestione delle reti Wi-Fi non disponibile sul NAS',
+  wifiNote_unavailable: 'Elenco delle reti Wi-Fi non disponibile',
   wizardNetworkFixed:
     'Gestione della rete non disponibile in questa installazione, resta attiva la connessione attuale.',
   wizardTokenTitle: 'Token delle release',
@@ -64,11 +67,11 @@ export default {
   wizardDiskEncryptedShort: 'cifrato',
   wizardSummaryTitle: 'Riepilogo',
   wizardConnection: 'Connessione',
-  wizardCurrentConnection: 'Connessione attuale',
   wizardPasswordSet: 'Impostata',
   wizardSummaryIntro:
     'Riepilogo delle scelte effettuate, da confermare per completare la configurazione.',
-  wizardComplete: 'Completa la configurazione',
+  wizardComplete: 'Completa',
+  wizardNoConnection: 'Non connessa',
   italian: 'Italiano',
   english: 'English',
   system: 'Sistema',
@@ -89,7 +92,7 @@ export default {
     'Token GitHub per scaricare gateway e launcher e, in seguito, le release private del launcher e delle applicazioni. Il token salvato non è più visualizzabile.',
   wizardInstallNote:
     'Al termine vengono installati gateway e launcher, salvati il token, l’account e l’utente del terminale, quindi si apre l’interfaccia del NAS.',
-  tokenCheck: 'Verifica il token',
+  tokenCheck: 'Verifica',
   tokenEmptyNote: 'Senza token si possono scaricare solo release pubbliche.',
   tokenNotSet: 'Nessuno',
   accessOk: 'Accessibile',

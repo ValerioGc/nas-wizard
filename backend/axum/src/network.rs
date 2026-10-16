@@ -41,7 +41,19 @@ pub struct Networks {
     pub connection: Connection,
     pub wifi: Vec<WifiNetwork>,
     pub can_connect: bool,
-    pub wifi_note: Option<String>,
+    pub wifi_note: Option<WifiNote>,
+}
+
+/// Why no Wi-Fi network is listed, as the page says it; the detail goes to the journal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WifiNote {
+    /// The machine has no Wi-Fi device NetworkManager manages.
+    NoDevice,
+    /// NetworkManager is missing or not running.
+    NoNetworkManager,
+    /// The preparation of the network or the list of the networks failed.
+    Unavailable,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,7 +71,7 @@ async fn run(program: &str, args: &[&str]) -> Option<String> {
         .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-// Dopo un reset la rete resta quella originale. Prepara il Wi-Fi solo su richiesta esplicita.
+// After a reset the network stays the original one: Wi-Fi is prepared only when asked for.
 async fn prepare_wifi() -> Result<(), String> {
     if run("nmcli", &["-t", "general", "status"]).await.is_some() {
         return Ok(());
@@ -166,15 +178,14 @@ pub fn parse_scan(listed: &str, known: &[String]) -> Vec<WifiNetwork> {
     networks
 }
 
-async fn scan(rescan: bool) -> Result<Vec<WifiNetwork>, String> {
+async fn scan(rescan: bool) -> Result<Vec<WifiNetwork>, WifiNote> {
     let Some(interface) = device("wifi").await else {
         return Err(
             if run("nmcli", &["-t", "general", "status"]).await.is_none() {
-                "NetworkManager does not answer: nmcli is missing or the service is not running"
+                WifiNote::NoNetworkManager
             } else {
-                "no Wi-Fi device: NetworkManager manages none on this machine"
-            }
-            .to_owned(),
+                WifiNote::NoDevice
+            },
         );
     };
     if rescan {
@@ -194,7 +205,10 @@ async fn scan(rescan: bool) -> Result<Vec<WifiNetwork>, String> {
         ],
     )
     .await
-    .ok_or_else(|| format!("nmcli could not list the networks seen by {interface}"))?;
+    .ok_or_else(|| {
+        eprintln!("nmcli could not list the networks seen by {interface}");
+        WifiNote::Unavailable
+    })?;
     Ok(parse_scan(&listed, &known_networks().await))
 }
 
@@ -254,7 +268,10 @@ pub async fn state(real: bool, rescan: bool) -> Networks {
     };
     let result = match preparation {
         Ok(()) => scan(rescan).await,
-        Err(reason) => Err(reason),
+        Err(reason) => {
+            eprintln!("the network could not be prepared: {reason}");
+            Err(WifiNote::Unavailable)
+        }
     };
     let (wifi, wifi_note) = match result {
         Ok(found) => (found, None),

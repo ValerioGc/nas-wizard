@@ -77,7 +77,7 @@ for unit in nas-os-firewall.service nas-os-smb-shares.service nas-os-sync-ports.
 done
 
 say "Base firewall"
-# Prima di qualsiasi purge, quando nft è ancora disponibile.
+# Before any purge, while nft is still there.
 "$configuration/scripts/firewall.sh" --remove
 
 say "Token"

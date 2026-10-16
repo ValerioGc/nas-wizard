@@ -50,7 +50,13 @@ function asRoot(script: string, installed: string[] = [], args: string[] = []) {
     'apt-get',
     `printf 'apt-get %s\\n' "$*"
 action=$1
-[[ $action == -s ]] && exit 0
+if [[ $action == -s ]]; then
+  # A package listed in needed is one a package that was already there depends on.
+  for package in "$@"; do
+    grep -qxF -- "$package" ${JSON.stringify(join(temp.path, 'needed'))} 2>/dev/null && printf 'Remv bash [5.2]\\n'
+  done
+  exit 0
+fi
 if [[ $action == install || $action == purge ]]; then
   while (($#)) && [[ $1 != -- ]]; do shift; done
   shift
@@ -252,6 +258,7 @@ describe('wifi.sh', () => {
     expect(removed.stdout).toContain('wireless check removed');
     expect(existsSync(root('etc/systemd/system/nas-os-wifi.service'))).toBe(false);
     expect(existsSync(root('etc/udev/rules.d/80-nas-os-wifi.rules'))).toBe(false);
+    expect(existsSync(root('usr/local/lib/nas-os-configuration'))).toBe(false);
 
     const unknown = asRoot('scripts/wifi.sh', [], ['--everything']);
     expect(unknown.code).not.toBe(0);
@@ -303,6 +310,34 @@ describe('removing what the configuration installed', () => {
     );
     expect(stdout).not.toContain('rm -rf');
     expect(existsSync(state())).toBe(false);
+  });
+
+  it('keeps a package an upgrade made necessary to one that was already there', () => {
+    expect(asRoot('install.sh', ['polkitd']).code).toBe(0);
+    writeFileSync(join(temp.path, 'needed'), 'nftables\n');
+
+    const { code, stdout } = asRoot('scripts/uninstall.sh');
+
+    expect(code).toBe(0);
+    expect(stdout).toContain('kept, now needed by the system: nftables');
+    expect(stdout).toMatch(
+      /apt-get purge -q -y -o DPkg::Lock::Timeout=600 -- (?!.*nftables).*network-manager/,
+    );
+  });
+
+  it('unmounts and closes the encrypted disks it opened before removing packages', () => {
+    expect(asRoot('install.sh', ['polkitd']).code).toBe(0);
+    mkdirSync(join(temp.path, 'root/dev/mapper'), { recursive: true });
+    writeFileSync(join(temp.path, 'root/dev/mapper/nas-luks-0f3a'), '');
+    writeFileSync(join(temp.path, 'root/dev/mapper/cryptroot'), '');
+    fakeCommand(temp.path, 'cryptsetup', `printf 'cryptsetup %s\\n' "$*"`);
+
+    const { code, stdout } = asRoot('scripts/uninstall.sh');
+
+    expect(code).toBe(0);
+    expect(stdout).toContain('cryptsetup close -- nas-luks-0f3a');
+    expect(stdout).not.toContain('cryptroot');
+    expect(stdout.indexOf('cryptsetup close')).toBeLessThan(stdout.indexOf('apt-get purge'));
   });
 
   it('refuses removal without the original system state', () => {

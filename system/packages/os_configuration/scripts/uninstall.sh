@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Salva lo stato precedente al NAS e ripristina soltanto le configurazioni che il NAS modifica.
-# --restore mantiene i pacchetti necessari al wizard; senza opzioni rimuove anche quelli aggiunti.
-# La copia iniziale resta protetta in /var/lib/nas-os-configuration/original e non viene sovrascritta.
-# --snapshot precede qualsiasi modifica; --check rifiuta ripristini senza una copia valida.
+# Saves the state from before the NAS and restores only the configuration the NAS changes.
+# --restore keeps the packages the wizard needs; without options it also removes those it added,
+# but never one a package that was already there has come to depend on, through an upgrade.
+# The first copy stays protected in /var/lib/nas-os-configuration/original and is never replaced.
+# --snapshot comes before any change; --check refuses a restore without a valid copy.
 set -euo pipefail
 
 readonly STATE=${NAS_CONFIGURATION_STATE:-/var/lib/nas-os-configuration}
@@ -61,7 +62,7 @@ snapshot() {
     if [[ -e $ROOT/$path || -L $ROOT/$path ]]; then printf '%s\n' "$path"; fi
   done >"$staging/present"
   tar --acls --xattrs -C "${ROOT:-/}" -cpf "$staging/files.tar" -T "$staging/present"
-  # Per dati dei pacchetti e mount salva solo la presenza e i metadati, senza copiarne i contenuti.
+  # Package data and mount points: only their presence and metadata, never their contents.
   for path in "${STORAGE_ROOTS[@]}" "${SHARED_DIRS[@]}" "${PACKAGE_DATA[@]}"; do
     if [[ -e $ROOT/$path || -L $ROOT/$path ]]; then
       tar --acls --xattrs --no-recursion -C "${ROOT:-/}" -rpf "$staging/files.tar" -- "$path"
@@ -88,7 +89,7 @@ snapshot() {
   done >"$staging/services"
   (cd "$staging" && sha256sum files.tar present services packages auto hostname users groups mounts >checksums)
   if [[ -f $staging/wakealarm ]]; then (cd "$staging" && sha256sum wakealarm >>checksums); fi
-  # La copia diventa disponibile solo dopo il completamento di tutti i salvataggi.
+  # The copy becomes available only once everything is saved.
   rm -rf -- "$ORIGINAL"
   mv -- "$staging" "$ORIGINAL"
   chmod 0700 "$ORIGINAL"
@@ -111,7 +112,7 @@ restore_files() {
   if [[ -f $ROOT/etc/hostname ]]; then static=$(<"$ROOT/etc/hostname"); fi
   hostnamectl --static hostname "$static"
   hostnamectl --transient hostname "$(<"$ORIGINAL/hostname")"
-  # hostnamectl può riscrivere il file: conserva anche contenuto e metadati originali.
+  # hostnamectl may rewrite the file: its original content and metadata come back too.
   if grep -qxF etc/hostname "$ORIGINAL/present"; then
     tar --acls --xattrs -C "${ROOT:-/}" -xpf "$ORIGINAL/files.tar" -- etc/hostname
   else
@@ -150,31 +151,61 @@ restore_services() {
   done <"$ORIGINAL/services"
 }
 
+# Whether purging these packages would take a package that was there before with it.
+removes_original() {
+  local name simulation
+  simulation=$(apt-get -s purge -- "$@") || fail 'the removal of the NAS packages could not be simulated'
+  while IFS= read -r name; do
+    if awk -F: -v name="${name%%:*}" '$1 == name { found = 1 } END { exit !found }' "$ORIGINAL/packages"; then
+      return 0
+    fi
+  done < <(printf '%s\n' "$simulation" | awk '$1 == "Remv" || $1 == "Purg" { print $2 }')
+  return 1
+}
+
 remove_packages() {
-  local name simulation record=${1:-$STATE/packages}
-  local -a added=() removed=()
+  local name record=${1:-$STATE/packages}
+  local -a added=() purged=() kept=()
   if [[ -s $record ]]; then
     mapfile -t added < <(LC_ALL=C sort -u "$record" |
       LC_ALL=C comm -23 - "$ORIGINAL/packages" |
       grep -E '^[a-z0-9][a-z0-9+.:~-]{0,200}$' | LC_ALL=C comm -12 - <(packages))
   fi
-  if ((${#added[@]} > 0)); then
-    simulation=$(apt-get -s purge -- "${added[@]}")
-    mapfile -t removed < <(printf '%s\n' "$simulation" | awk '$1 == "Remv" || $1 == "Purg" { print $2 }')
-    for name in "${removed[@]}"; do
-      if awk -F: -v name="${name%%:*}" '$1 == name { found = 1 } END { exit !found }' "$ORIGINAL/packages"; then
-        fail "removing NAS packages would remove pre-existing package $name"
-      fi
-    done
-    DEBIAN_FRONTEND=noninteractive apt-get purge -q -y -o DPkg::Lock::Timeout=600 -- "${added[@]}"
+  # A package an upgrade of Debian made necessary to one that was already there stays, at the
+  # version it has.
+  for name in "${added[@]}"; do
+    if removes_original "$name"; then kept+=("$name"); else purged+=("$name"); fi
+  done
+  ((${#kept[@]} == 0)) || printf 'kept, now needed by the system: %s\n' "${kept[*]}"
+  if ((${#purged[@]} > 0)); then
+    ! removes_original "${purged[@]}" || fail 'removing NAS packages would remove pre-existing packages'
+    DEBIAN_FRONTEND=noninteractive apt-get purge -q -y -o DPkg::Lock::Timeout=600 -- "${purged[@]}"
   fi
-  # Ripristina le marcature apt senza fare un autoremove globale.
+  # The apt marks come back, without a global autoremove.
   local -a auto=() manual=()
   mapfile -t auto < <(LC_ALL=C comm -12 "$ORIGINAL/auto" <(packages))
   mapfile -t manual < <(LC_ALL=C comm -23 "$ORIGINAL/packages" "$ORIGINAL/auto" |
     LC_ALL=C comm -12 - <(packages))
   ((${#auto[@]} == 0)) || apt-mark auto "${auto[@]}" >/dev/null
   ((${#manual[@]} == 0)) || apt-mark manual "${manual[@]}" >/dev/null
+}
+
+# Unmounts only what the NAS mounted, children first, and closes the encrypted data disks it opened,
+# before cryptsetup may go with the packages. No file on the disks is removed.
+release_volumes() {
+  local current target mapper
+  current=$(mounts)
+  while IFS= read -r target; do
+    [[ -n $target ]] || continue
+    umount -- "$target"
+    rmdir -- "$target" 2>/dev/null || true
+  done < <(LC_ALL=C comm -23 <(printf '%s\n' "$current") "$ORIGINAL/mounts" | LC_ALL=C sort -r)
+  command -v cryptsetup >/dev/null || return 0
+  for mapper in "$ROOT"/dev/mapper/nas-luks-*; do
+    [[ -e $mapper ]] || continue
+    cryptsetup close -- "${mapper##*/}" ||
+      printf 'warning: %s stays open until the next boot\n' "${mapper##*/}" >&2
+  done
 }
 
 [[ $EUID -eq 0 || -n ${NAS_CONFIGURATION_STATE:-} ]] || fail 'run this script as root'
@@ -192,7 +223,7 @@ case ${1:-} in
   --remove-terminal-user)
     user=${2:-}
     [[ $user =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || fail 'invalid terminal user'
-    # L'amministratore Debian nas non appartiene al wizard e non va mai rimosso.
+    # The Debian administrator nas is not the wizard's and is never removed.
     [[ $user != nas ]] || exit 0
     check_snapshot
     if grep -qxF -- "$user" "$ORIGINAL/users"; then exit 0; fi
@@ -214,7 +245,7 @@ case ${1:-} in
     check_snapshot
     record=${NAS_APP_PACKAGES_RECORD:-/var/lib/nas-os-app-packages/installed}
     remove_packages "$record"
-    # Rimuove solo dipendenze aggiunte dal NAS che apt non considera più necessarie.
+    # Only dependencies the NAS added that apt no longer needs.
     simulation=$(apt-get -s autoremove)
     temporary=$(mktemp)
     trap 'rm -f -- "$temporary"' EXIT
@@ -236,23 +267,17 @@ case ${1:-} in
 esac
 check_snapshot
 if [[ ${NAS_RESTORE_RECOVERY:-} != 1 ]]; then
-  # Anche un purge fallito deve lasciare ripristinata la rete precedente.
+  # A failed purge must still leave the previous network restored.
   trap 'status=$?; if ((status != 0)); then NAS_RESTORE_RECOVERY=1 bash "$0" --restore || printf "error: recovery failed; original system backup retained in %s\n" "$ORIGINAL" >&2; fi' EXIT
 fi
 stop_services
+release_volumes
 if [[ ${1:-} != --restore ]]; then remove_packages; fi
-current_mounts=$(mounts)
-while IFS= read -r target; do
-  [[ -n $target ]] || continue
-  # Smonta soltanto i punti introdotti dal NAS, prima i figli. Non elimina file dai dischi.
-  umount -- "$target"
-  rmdir -- "$target" 2>/dev/null || true
-done < <(LC_ALL=C comm -23 <(printf '%s\n' "$current_mounts") "$ORIGINAL/mounts" | LC_ALL=C sort -r)
 for path in "${PACKAGE_DATA[@]}"; do
   if grep -qxF -- "$path" "$ORIGINAL/present"; then
     tar --acls --xattrs -C "${ROOT:-/}" -xpf "$ORIGINAL/files.tar" -- "$path"
   else
-    # Rimuove dati e cache dei pacchetti solo se la directory non esisteva prima del NAS.
+    # Package data and caches go only when the directory was not there before the NAS.
     rm -rf -- "$ROOT/$path"
   fi
 done

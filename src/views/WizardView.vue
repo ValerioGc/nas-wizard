@@ -30,6 +30,12 @@ import WizardStep from '@/components/WizardStep.vue';
 import WizardToken from '@/components/WizardToken.vue';
 import logoSource from '@/assets/logo.svg';
 import infoIcon from '@/assets/icons/status/info.svg';
+import arrowLeftIcon from '@/assets/icons/navigation/arrow_left.svg';
+import arrowRightIcon from '@/assets/icons/navigation/arrow_right.svg';
+import errorIcon from '@/assets/icons/status/error.svg';
+import successIcon from '@/assets/icons/status/success.svg';
+import lanIcon from '@/assets/icons/network/lan.svg';
+import wifiIcon from '@/assets/icons/network/wifi.svg';
 
 type Step = 'welcome' | 'account' | 'appearance' | 'network' | 'disks' | 'token' | 'summary';
 
@@ -70,6 +76,13 @@ const connection = ref<WizardNetworks['connection'] | null>(null);
 const unreachable = ref('');
 const disks = ref<DisksOffer>({ enabled: false, encryption: false, disks: [] });
 const plans = ref<Record<string, DiskPlan>>({});
+// Where the installation is, as its step says, and whether the NAS is being opened.
+const progress = ref<WizardState | null>(null);
+const installer = ref<InstanceType<typeof WizardInstall> | null>(null);
+const leaving = ref(false);
+const canLogin = computed(
+  () => progress.value?.phase === 'done' && !progress.value.simulated && !leaving.value,
+);
 
 const steps = computed(() => (disks.value.enabled ? DISK_STEPS : STEPS));
 const step = computed(() => steps.value[position.value] ?? 'welcome');
@@ -97,24 +110,35 @@ const title = computed(() => (installing.value ? t('installTitle') : t(TITLES[st
 const description = computed(() =>
   installing.value ? t('installIntro') : t(TITLES[step.value][1]),
 );
-const tokenSummary = computed(() => (token.value.trim() ? 'tokenSet' : 'tokenNotSet'));
-const networkSummary = computed(() => {
+/** A line of the summary: a value, an icon that says it, or both. */
+interface SummaryRow {
+  label: string;
+  value?: string;
+  icon?: string;
+  iconLabel?: string;
+}
+const tokenSet = computed(() => !!token.value.trim());
+const networkSummary = computed<Omit<SummaryRow, 'label'>>(() => {
   const current = connection.value;
   if (!current?.connected) {
-    return t('wizardCurrentConnection');
+    return { icon: errorIcon, iconLabel: t('wizardNoConnection') };
   }
   if (current.kind === 'wifi') {
-    return current.ssid ? `Wi-Fi · ${current.ssid}` : 'Wi-Fi';
+    return { icon: wifiIcon, iconLabel: 'Wi-Fi', value: current.ssid ?? undefined };
   }
-  return t('wiredConnection');
+  return { icon: lanIcon, iconLabel: t('wiredConnection') };
 });
-const summary = computed(() => [
+const summary = computed<SummaryRow[]>(() => [
   { label: 'usernameLabel', value: account.username.trim() },
-  { label: 'passwordLabel', value: t('wizardPasswordSet'), status: true },
-  { label: 'wizardConnection', value: networkSummary.value },
+  { label: 'passwordLabel', icon: successIcon, iconLabel: t('wizardPasswordSet') },
+  { label: 'wizardConnection', ...networkSummary.value },
   { label: 'language', value: t(language.value === 'it' ? 'italian' : 'english') },
   { label: 'theme', value: t(theme.value) },
-  { label: 'tokenField', value: t(tokenSummary.value), status: !!token.value.trim() },
+  {
+    label: 'tokenField',
+    icon: tokenSet.value ? successIcon : errorIcon,
+    iconLabel: t(tokenSet.value ? 'tokenSet' : 'tokenNotSet'),
+  },
   ...(disks.value.enabled ? [{ label: 'wizardDisksSummary', value: disksSummary.value }] : []),
 ]);
 const ready = computed(() => {
@@ -185,6 +209,13 @@ async function finish() {
   }
 }
 
+/** Opens the sign-in of the NAS once the gateway answers in place of the wizard. */
+async function openLogin() {
+  leaving.value = true;
+  await installer.value?.openLogin();
+  leaving.value = false;
+}
+
 onMounted(load);
 
 </script>
@@ -197,7 +228,12 @@ onMounted(load);
         <CommonSpinner v-else :label="t('wizardLoading')" centered />
       </template>
 
-      <WizardInstall v-else-if="installing" :initial="wizard" />
+      <WizardInstall
+        v-else-if="installing"
+        ref="installer"
+        :initial="wizard"
+        @state="progress = $event"
+      />
 
       <template v-else>
         <WizardProgress v-if="position > 0" :current="position" :total="steps.length - 1" />
@@ -242,7 +278,16 @@ onMounted(load);
             <dl class="wizard_summary_details">
               <div v-for="detail in summary" :key="detail.label" class="wizard_summary_row">
                 <dt>{{ t(detail.label) }}</dt>
-                <dd :class="{ wizard_summary_status: detail.status }">{{ detail.value }}</dd>
+                <dd>
+                  <CommonIcon
+                    v-if="detail.icon"
+                    :src="detail.icon"
+                    size="small"
+                    :label="detail.iconLabel"
+                    :title="detail.iconLabel"
+                  />
+                  <span v-if="detail.value">{{ detail.value }}</span>
+                </dd>
               </div>
             </dl>
           </section>
@@ -255,24 +300,38 @@ onMounted(load);
         <AlertBanner v-if="error" tone="error" compact>{{ error }}</AlertBanner>
       </template>
 
-      <template v-if="wizard && !installing" #actions>
+      <template v-if="wizard" #actions>
         <button
-          v-if="position > 0"
+          v-if="!installing && position > 0"
           type="button"
           :disabled="busy"
           data-testid="wizard_back"
           @click="position--"
         >
+          <CommonIcon :src="arrowLeftIcon" size="small" tinted />
           {{ t('back') }}
         </button>
 
         <button
-          v-if="step === 'welcome'"
+          v-if="installing"
+          type="button"
+          class="primary"
+          :disabled="!canLogin"
+          data-testid="wizard_login"
+          @click="openLogin"
+        >
+          <CommonSpinner v-if="leaving" size="small" compact />
+          <CommonIcon v-else :src="arrowRightIcon" size="small" tinted />
+          {{ t('next') }}
+        </button>
+        <button
+          v-else-if="step === 'welcome'"
           type="button"
           class="primary"
           data-testid="wizard_start"
           @click="position++"
         >
+          <CommonIcon :src="arrowRightIcon" size="small" tinted />
           {{ t('wizardConfigure') }}
         </button>
         <button
@@ -284,6 +343,7 @@ onMounted(load);
           @click="finish"
         >
           <CommonSpinner v-if="busy" size="small" compact />
+          <CommonIcon v-else :src="successIcon" size="small" tinted />
           {{ t('wizardComplete') }}
         </button>
         <button
@@ -294,6 +354,7 @@ onMounted(load);
           data-testid="wizard_next"
           @click="position++"
         >
+          <CommonIcon :src="arrowRightIcon" size="small" tinted />
           {{ t('next') }}
         </button>
       </template>
@@ -338,7 +399,7 @@ onMounted(load);
 .wizard_summary_row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-  align-items: baseline;
+  align-items: center;
   gap: $space_3;
   padding-block: $space_2 * 0.75;
   font-size: $text_label;
@@ -348,6 +409,10 @@ onMounted(load);
   }
 
   dd {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: $space_2;
     margin: 0;
     overflow-wrap: anywhere;
     font-weight: 600;
@@ -355,18 +420,16 @@ onMounted(load);
   }
 }
 
-.wizard_summary_status {
-  color: var(--status-success);
-}
-
 .wizard_summary_note {
   display: flex;
   align-items: flex-start;
   gap: $space_2;
 
+  // As tall as the two lines of the note beside it.
   :deep(.common_icon) {
+    width: 2lh;
+    height: 2lh;
     flex-shrink: 0;
-    margin-top: 0.2em;
   }
 }
 

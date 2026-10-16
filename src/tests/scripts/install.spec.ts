@@ -95,6 +95,7 @@ describe('install.sh', () => {
       'Environment=WIZARD_SCREEN_PORT=8081',
       'Environment=WIZARD_UI_DIR=/usr/local/lib/nas-wizard/wizard/ui',
       `Environment="NAS_WIZARD_PACKAGE=${ROOT}"`,
+      'Environment=TOKIO_WORKER_THREADS=2 MALLOC_ARENA_MAX=2',
       'WantedBy=multi-user.target',
     ]) {
       expect(stdout).toContain(line);

@@ -30,6 +30,8 @@ case ${1:-} in
     load=$(systemctl show "$NAME" --property=LoadState --value)
     if [[ $load != not-found ]]; then systemctl disable --now "$NAME"; fi
     rm -f -- "$UNIT" "$RULE" "$CHECK"
+    # Shared with the base firewall: the last of the two to go removes it.
+    rmdir "$(dirname "$CHECK")" 2>/dev/null || true
     systemctl unmask --runtime wpa_supplicant.service >/dev/null
     systemctl daemon-reload
     udevadm control --reload >/dev/null 2>&1 || true

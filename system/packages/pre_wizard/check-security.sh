@@ -27,7 +27,7 @@ esac
 
 # Whether a block device lies on a LUKS container: one of the devices under it is one.
 on_luks() {
-  # Legge tutto l'output: grep -q può causare SIGPIPE e un falso negativo con pipefail.
+  # Reads the whole output: grep -q may cause SIGPIPE and a false negative under pipefail.
   lsblk --inverse --noheadings --raw --output FSTYPE -- "$1" 2>/dev/null | grep -x crypto_LUKS >/dev/null
 }
 

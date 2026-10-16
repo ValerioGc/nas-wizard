@@ -157,7 +157,7 @@ describe('setup wizard', () => {
     await next(wrapper).trigger('click');
     await flushPromises();
 
-    expect(wrapper.get('h1').text()).toBe('Rete Wi-Fi');
+    expect(wrapper.get('h1').text()).toBe('Connessione di rete');
     expect(next(wrapper).attributes('disabled')).toBeDefined();
     networks.connection.connected = true;
     wrapper.unmount();
@@ -169,8 +169,13 @@ describe('setup wizard', () => {
 
     expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('admin');
     expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('attic');
-    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('rete via cavo');
-    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('Impostata');
+    const icons = () =>
+      wrapper
+        .get('[data-testid="wizard_summary"]')
+        .findAll('dd [role="img"]')
+        .map((icon) => icon.attributes('aria-label'));
+    expect(icons()).toEqual(['Impostata', 'rete via cavo', 'Impostato']);
+    expect(wrapper.get('[data-testid="wizard_finish"]').text()).toBe('Completa');
     expect(
       wrapper
         .get('[data-testid="wizard_summary"]')
@@ -182,7 +187,7 @@ describe('setup wizard', () => {
         .get('[data-testid="wizard_summary"]')
         .findAll('dd')
         .map((value) => value.text()),
-    ).toEqual(['admin', 'Impostata', 'rete via cavo', 'Italiano', 'Scuro', 'Impostato']);
+    ).toEqual(['admin', '', '', 'Italiano', 'Scuro', '']);
     expect(wrapper.get('[data-testid="wizard_summary"]').text()).not.toContain('ghp_token');
     expect(wrapper.get('[data-testid="wizard_summary"]').text()).not.toContain('long enough');
     await wrapper.get('[data-testid="wizard_finish"]').trigger('click');
@@ -222,8 +227,9 @@ describe('setup wizard', () => {
     networks.connection = { kind: 'wifi', connected: true, ssid: 'Home Office' };
     const wrapper = await opened();
     await walkThrough(wrapper);
-    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('Wi-Fi · Home Office');
-    expect(wrapper.get('[data-testid="wizard_summary"]').text()).not.toContain('rete via cavo');
+    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('Home Office');
+    expect(wrapper.find('[data-testid="wizard_summary"] [aria-label="Wi-Fi"]').exists()).toBe(true);
+    expect(wrapper.find('[aria-label="rete via cavo"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
@@ -231,7 +237,9 @@ describe('setup wizard', () => {
     const wrapper = await opened();
     await walkThrough(wrapper, '');
 
-    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('Nessuno');
+    expect(wrapper.find('[data-testid="wizard_summary"] [aria-label="Nessuno"]').exists()).toBe(
+      true,
+    );
     expect(wrapper.find('[data-testid="wizard_summary_mtls"]').exists()).toBe(false);
     await wrapper.get('[data-testid="wizard_finish"]').trigger('click');
     await flushPromises();
@@ -275,6 +283,38 @@ describe('setup wizard', () => {
 
     expect(wrapper.get('h1').text()).toBe('Installazione del NAS');
     expect(wrapper.find('[data-testid="wizard_start"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="wizard_back"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="wizard_login"]').attributes('disabled')).toBeDefined();
+    wrapper.unmount();
+  });
+
+  it('goes to the sign-in of the NAS from the last step once the installation is over', async () => {
+    answering({ ...wizard('done'), simulated: false });
+    const fetch = vi.fn(
+      async (path: string) =>
+        new Response(path === '/health' ? 'ok' : '<!doctype html>', { status: 200 }),
+    );
+    const assign = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    vi.stubGlobal('location', { assign, origin: 'http://localhost' });
+    const wrapper = await opened();
+
+    const login = wrapper.get('[data-testid="wizard_login"]');
+    expect(login.attributes('disabled')).toBeUndefined();
+    expect(login.text()).toBe('Avanti');
+    await login.trigger('click');
+    await flushPromises();
+    expect(assign).toHaveBeenCalledWith('/login');
+    wrapper.unmount();
+  });
+
+  it('shows no way back on the first page and keeps the way forward at the end of the row', async () => {
+    const wrapper = await opened();
+
+    expect(wrapper.find('[data-testid="wizard_back"]').exists()).toBe(false);
+    expect(wrapper.get('.wizard_actions').findAll('button')).toHaveLength(1);
+    await wrapper.get('[data-testid="wizard_start"]').trigger('click');
+    expect(wrapper.get('[data-testid="wizard_back"]').text()).toBe('Indietro');
     wrapper.unmount();
   });
 

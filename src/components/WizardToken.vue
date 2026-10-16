@@ -13,6 +13,7 @@ import CommonPasswordInput from '@/components/commons/CommonPasswordInput.vue';
 import CommonSpinner from '@/components/commons/CommonSpinner.vue';
 import errorIcon from '@/assets/icons/status/error.svg';
 import successIcon from '@/assets/icons/status/success.svg';
+import verifyIcon from '@/assets/icons/system/verify.svg';
 
 const token = defineModel<string>({ required: true });
 
@@ -81,6 +82,7 @@ async function check() {
           @click="check"
         >
           <CommonSpinner v-if="checking" size="small" compact />
+          <CommonIcon v-else :src="verifyIcon" size="small" tinted />
           {{ t('tokenCheck') }}
         </button>
       </div>

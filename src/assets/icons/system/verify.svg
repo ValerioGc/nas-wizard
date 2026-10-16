@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+     stroke="#899aeb" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+  <title>Verify</title>
+  <path d="M12 3 5 5.8v5.4c0 4.4 3 8 7 9.8 4-1.8 7-5.4 7-9.8V5.8z"/>
+  <path d="m8.8 12.2 2.3 2.3 4.2-4.4"/>
+</svg>

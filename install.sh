@@ -146,6 +146,7 @@ Environment=WIZARD_PORT=$PORT
 Environment=WIZARD_SCREEN_PORT=8081
 Environment=WIZARD_UI_DIR=$INSTALLED/wizard/ui
 Environment="NAS_WIZARD_PACKAGE=$package"
+Environment=TOKIO_WORKER_THREADS=2 MALLOC_ARENA_MAX=2
 
 [Install]
 WantedBy=multi-user.target

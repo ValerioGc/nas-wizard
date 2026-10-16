@@ -23,7 +23,7 @@ export interface WizardNetworks {
   connection: { kind: 'lan' | 'wifi'; connected: boolean; ssid: string | null };
   wifi: WizardNetwork[];
   canConnect: boolean;
-  wifiNote: string | null;
+  wifiNote: 'noDevice' | 'noNetworkManager' | 'unavailable' | null;
 }
 
 // Where the wizard is: collecting the choices, installing, ready (the certificates are offered and

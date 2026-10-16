@@ -75,7 +75,7 @@ async fn reads_the_network_of_the_machine_whatever_it_has() {
     assert!(!networks.can_connect);
     assert!(networks.connection.connected || networks.connection.ssid.is_none());
     match &networks.wifi_note {
-        Some(note) => assert!(networks.wifi.is_empty() && !note.is_empty()),
+        Some(_) => assert!(networks.wifi.is_empty()),
         None => assert!(networks.wifi.iter().all(|network| !network.ssid.is_empty())),
     }
 }

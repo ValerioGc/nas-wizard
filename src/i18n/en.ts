@@ -12,7 +12,7 @@ export default {
   loading: 'Loading',
   networkPassword: 'Network password',
   next: 'Next',
-  noNetworks: 'No Wi-Fi network found.',
+  noNetworks: 'No Wi-Fi network found',
   passwordLabel: 'Password',
   passwordMismatch: 'The two passwords do not match.',
   requestFailed: 'Operation failed. The NAS did not answer.',
@@ -42,8 +42,12 @@ export default {
   nasName: 'Name of the NAS',
   nasNameInvalid:
     'Up to 63 characters among letters, numbers and hyphens, without a leading or trailing hyphen.',
-  wizardNetworkTitle: 'Wi-Fi network',
-  wizardNetworkIntro: 'Wi-Fi network for the NAS. With a wired connection this step is optional.',
+  wizardNetworkTitle: 'Network connection',
+  wizardNetworkIntro:
+    'Connection of the NAS to the local network, wired or Wi-Fi. With the cable plugged in, Wi-Fi is optional.',
+  wifiNote_noDevice: 'No Wi-Fi device found on the NAS',
+  wifiNote_noNetworkManager: 'Wi-Fi management unavailable on the NAS',
+  wifiNote_unavailable: 'Wi-Fi network list unavailable',
   wizardNetworkFixed:
     'Network management not available in this installation, the current connection stays active.',
   wizardTokenTitle: 'Release token',
@@ -63,11 +67,11 @@ export default {
   wizardDiskEncryptedShort: 'encrypted',
   wizardSummaryTitle: 'Summary',
   wizardConnection: 'Connection',
-  wizardCurrentConnection: 'Current connection',
   wizardPasswordSet: 'Set',
   wizardSummaryIntro:
     'A summary of the choices made, to be confirmed to complete the configuration.',
-  wizardComplete: 'Complete the configuration',
+  wizardComplete: 'Complete',
+  wizardNoConnection: 'Not connected',
   italian: 'Italiano',
   english: 'English',
   system: 'System',
@@ -88,7 +92,7 @@ export default {
     'GitHub token used to download gateway and launcher and, later, the private releases of the launcher and of the applications. The saved token cannot be displayed.',
   wizardInstallNote:
     'At the end gateway and launcher are installed, the token, the account and the terminal user are saved, then the interface of the NAS opens.',
-  tokenCheck: 'Check the token',
+  tokenCheck: 'Check',
   tokenEmptyNote: 'Without a token only public releases can be downloaded.',
   tokenNotSet: 'None',
   accessOk: 'Readable',

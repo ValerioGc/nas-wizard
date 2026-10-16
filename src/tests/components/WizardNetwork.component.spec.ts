@@ -95,12 +95,14 @@ it('says why nothing is listed, and what went wrong', async () => {
     ...reachable,
     wifi: [],
     canConnect: false,
-    wifiNote: 'no wireless interface',
+    wifiNote: 'noDevice',
   });
   const wrapper = mount(WizardNetwork);
   await flushPromises();
 
-  expect(wrapper.text()).toContain('no wireless interface');
+  expect(wrapper.get('[data-testid="wizard_network_note"]').text()).toBe(
+    'Nessun dispositivo Wi-Fi rilevato sul NAS',
+  );
   expect(wrapper.text()).toContain('Gestione della rete non disponibile');
 
   vi.mocked(request).mockRejectedValueOnce(new Error('the NAS is already configured'));
