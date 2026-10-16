@@ -10,7 +10,7 @@ Given('the wizard opens on a NAS never configured', async ({ page }) => {
   await page.route('**/api/wizard/network/scan', (route) =>
     route.fulfill({
       json: {
-        connection: { kind: 'lan', connected: true, ssid: null },
+        connection: { kind: 'wifi', connected: true, ssid: 'Home' },
         wifi: [{ ssid: 'Home', signal: 70, security: 'WPA2', known: false }],
         canConnect: false,
         wifiNote: null,

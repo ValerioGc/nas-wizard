@@ -45,7 +45,7 @@ export default {
   wizardNetworkTitle: 'Network connection',
   wizardNetworkIntro:
     'Connection of the NAS to the local network, wired or Wi-Fi. With the cable plugged in, Wi-Fi is optional.',
-  wifiNote_noDevice: 'No Wi-Fi device found on the NAS',
+  wifiNote_noDevice: 'No Wi-Fi network card found',
   wifiNote_noNetworkManager: 'Wi-Fi management unavailable on the NAS',
   wifiNote_unavailable: 'Wi-Fi network list unavailable',
   wizardNetworkFixed:

@@ -4,8 +4,8 @@
 //! --initialize-storage`, `nas-os-axum --storage-crypt`), which checks the disk again, its
 //! identity included, before it erases anything.
 //!
-//! The step is off until it is tried on a machine: `WIZARD_DISKS_MODE=real` shows it,
-//! `WIZARD_ENCRYPTION_MODE=real` offers encryption there too. An encrypted disk opens with the
+//! The step is on by default: `WIZARD_DISKS_MODE=off` hides it, `WIZARD_ENCRYPTION_MODE=off`
+//! stops offering encryption there. An encrypted disk opens with the
 //! automatic key only: no password travels in the plain HTTP of the wizard, and the person sets one
 //! later in the app Dischi.
 

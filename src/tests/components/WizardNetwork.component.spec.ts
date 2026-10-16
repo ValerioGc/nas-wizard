@@ -7,7 +7,7 @@ import { setLocale } from '@/i18n';
 vi.mock('@/api/client', () => ({ request: vi.fn() }));
 
 const reachable = {
-  connection: { kind: 'lan', connected: true, ssid: null },
+  connection: { kind: 'wifi', connected: true, ssid: 'Home' },
   wifi: [
     { ssid: 'Home', signal: 80, security: 'WPA2', known: false },
     { ssid: 'Guest', signal: 40, security: 'open', known: false },
@@ -29,10 +29,25 @@ it('looks for networks on opening and says where the NAS is connected', async ()
     '/wizard/network/scan',
     expect.objectContaining({ method: 'POST', body: '{}' }),
   );
+  expect(wrapper.get('[data-testid="wizard_network_current"]').text()).toBe('Collegato a Home');
+  expect(wrapper.findAll('li').map((row) => row.text())).toEqual(['Home80%', 'Guest40%']);
+});
+
+it('offers no Wi-Fi to a NAS on the cable', async () => {
+  vi.mocked(request).mockResolvedValueOnce({
+    ...reachable,
+    connection: { kind: 'lan', connected: true, ssid: null },
+    wifiNote: 'noDevice',
+  });
+  const wrapper = mount(WizardNetwork);
+  await flushPromises();
+
   expect(wrapper.get('[data-testid="wizard_network_current"]').text()).toBe(
     'Collegato a rete via cavo',
   );
-  expect(wrapper.findAll('li').map((row) => row.text())).toEqual(['Home80%', 'Guest40%']);
+  expect(wrapper.find('li').exists()).toBe(false);
+  expect(wrapper.find('[data-testid="wizard_network_note"]').exists()).toBe(false);
+  expect(wrapper.find('[data-testid="wizard_network_scan"]').exists()).toBe(true);
 });
 
 it('shows a spinner in place of the list while it looks for networks', async () => {
@@ -93,6 +108,7 @@ it('joins an open network without asking for a password', async () => {
 it('says why nothing is listed, and what went wrong', async () => {
   vi.mocked(request).mockResolvedValueOnce({
     ...reachable,
+    connection: { kind: 'wifi', connected: false, ssid: null },
     wifi: [],
     canConnect: false,
     wifiNote: 'noDevice',
@@ -101,7 +117,7 @@ it('says why nothing is listed, and what went wrong', async () => {
   await flushPromises();
 
   expect(wrapper.get('[data-testid="wizard_network_note"]').text()).toBe(
-    'Nessun dispositivo Wi-Fi rilevato sul NAS',
+    'Nessuna scheda di rete Wi-Fi rilevata',
   );
   expect(wrapper.text()).toContain('Gestione della rete non disponibile');
 

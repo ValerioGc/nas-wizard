@@ -37,6 +37,8 @@ export default defineConfig({
         WIZARD_GATEWAY_REPOSITORY: 'example/nas-gateway',
         WIZARD_UI_REPOSITORY: 'example/nas-launcher',
         WIZARD_STATE_DIR: 'backend/data/e2e',
+        // The step of the data disks would list the disks of the host running the tests.
+        WIZARD_DISKS_MODE: 'off',
       },
       url: 'http://127.0.0.1:3011/api/wizard',
       timeout: 300_000,

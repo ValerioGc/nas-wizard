@@ -9,6 +9,9 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The step of the data disks and its encryption are on by default, in development mode too;
+  `WIZARD_DISKS_MODE=off` and `WIZARD_ENCRYPTION_MODE=off` in the unit turn them off. Untested on a
+  machine.
 - The removal of the NAS and the factory reset keep a package the NAS installed when an upgrade of
   Debian made a package that was already there depend on it, at the version it has, instead of
   stopping. They unmount and close the encrypted data disks the NAS opened before removing the

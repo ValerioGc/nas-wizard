@@ -45,7 +45,7 @@ export default {
   wizardNetworkTitle: 'Connessione di rete',
   wizardNetworkIntro:
     'Connessione del NAS alla rete locale, via cavo o Wi-Fi. Con il cavo collegato il Wi-Fi è facoltativo.',
-  wifiNote_noDevice: 'Nessun dispositivo Wi-Fi rilevato sul NAS',
+  wifiNote_noDevice: 'Nessuna scheda di rete Wi-Fi rilevata',
   wifiNote_noNetworkManager: 'Gestione delle reti Wi-Fi non disponibile sul NAS',
   wifiNote_unavailable: 'Elenco delle reti Wi-Fi non disponibile',
   wizardNetworkFixed:

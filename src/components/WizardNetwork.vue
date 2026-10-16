@@ -1,6 +1,6 @@
 <script setup lang="ts">
 
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { t } from '@/i18n';
 import { request } from '@/api/client';
 import type { WizardNetwork, WizardNetworks } from '@/types/types';
@@ -28,6 +28,10 @@ const chosen = ref<WizardNetwork | null>(null);
 const password = ref('');
 const joining = ref(false);
 const error = ref('');
+// With the cable plugged in the NAS needs no Wi-Fi: its networks are not offered.
+const wired = computed(
+  () => !!state.value?.connection.connected && state.value.connection.kind === 'lan',
+);
 
 function needsPassword(network: WizardNetwork) {
   return !network.known && network.security !== 'open';
@@ -110,8 +114,9 @@ onMounted(scan);
       testid="wizard_network_scanning"
     />
 
-    <template v-else>
-      <p v-if="error" role="alert" class="app_error">{{ error }}</p>
+    <p v-else-if="error" role="alert" class="app_error">{{ error }}</p>
+
+    <template v-if="!scanning && !wired">
       <p v-if="state && !state.canConnect" class="muted">{{ t('wizardNetworkFixed') }}</p>
       <p
         v-if="state && !state.wifi.length"

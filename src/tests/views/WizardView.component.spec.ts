@@ -284,27 +284,7 @@ describe('setup wizard', () => {
     expect(wrapper.get('h1').text()).toBe('Installazione del NAS');
     expect(wrapper.find('[data-testid="wizard_start"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="wizard_back"]').exists()).toBe(false);
-    expect(wrapper.get('[data-testid="wizard_login"]').attributes('disabled')).toBeDefined();
-    wrapper.unmount();
-  });
-
-  it('goes to the sign-in of the NAS from the last step once the installation is over', async () => {
-    answering({ ...wizard('done'), simulated: false });
-    const fetch = vi.fn(
-      async (path: string) =>
-        new Response(path === '/health' ? 'ok' : '<!doctype html>', { status: 200 }),
-    );
-    const assign = vi.fn();
-    vi.stubGlobal('fetch', fetch);
-    vi.stubGlobal('location', { assign, origin: 'http://localhost' });
-    const wrapper = await opened();
-
-    const login = wrapper.get('[data-testid="wizard_login"]');
-    expect(login.attributes('disabled')).toBeUndefined();
-    expect(login.text()).toBe('Avanti');
-    await login.trigger('click');
-    await flushPromises();
-    expect(assign).toHaveBeenCalledWith('/login');
+    expect(wrapper.find('.wizard_actions').exists()).toBe(false);
     wrapper.unmount();
   });
 

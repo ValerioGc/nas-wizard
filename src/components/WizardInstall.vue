@@ -18,7 +18,6 @@ interface Props {
 }
 
 const props = defineProps<Props>();
-const emit = defineEmits<{ state: [value: WizardState] }>();
 
 const POLL_INTERVAL = 2000;
 const LABELS: Record<StepId, string> = {
@@ -62,9 +61,6 @@ const handingOver = computed(() => state.value.phase === 'done' && !state.value.
  * from an older gateway; do not follow any redirect while checking it.
  */
 async function nasReady() {
-  if (!handingOver.value) {
-    return;
-  }
   try {
     const response = await fetch('/health', {
       cache: 'no-store',
@@ -116,11 +112,6 @@ async function retry() {
 }
 
 usePolling(refresh, ref(POLL_INTERVAL));
-
-watch(state, (value) => emit('state', value), { immediate: true });
-
-// The button of the step that opens the NAS as soon as it answers.
-defineExpose({ openLogin: nasReady });
 
 // The list fills the step: a failure brings the button that retries into view.
 watch(

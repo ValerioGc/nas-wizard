@@ -87,15 +87,15 @@ I passi:
 | `complete`         | `nas-wizard complete`: aspetta il launcher (si riavvia per il token), poi `setup/complete` |
 | `handover`         | Dopo la conferma della pagina: chiude il listener, avvia il gateway, aspetta `/health`     |
 
-Il passo `disks` esiste sempre ma lavora solo se la pagina ha scelto dei dischi: con
-`WIZARD_DISKS_MODE=real` nell'unità il wizard mostra il passaggio Dischi dati (`GET
-/api/wizard/disks`, `axum/src/disks.rs`), che elenca i dischi interi interni senza il sistema e
-propone di inizializzare quelli vuoti; con anche `WIZARD_ENCRYPTION_MODE=real` propone di cifrarli
-con la sola chiave automatica, perché nel wizard in HTTP non passano password. Le scelte arrivano a
-`post_wizard` in `disks.json` nella cartella di lavoro (nessun segreto) con `--disks`; `nas-wizard
-disks` le esegue con `nas-os-axum --initialize-storage` e `nas-os-axum --storage-crypt`, che
-ricontrollano disco e identità prima di cancellare; le chiavi stanno in `/run/nas-wizard-disks`.
-Entrambi gli interruttori sono spenti finché il passaggio non è provato su una macchina.
+Il passo `disks` esiste sempre ma lavora solo se la pagina ha scelto dei dischi: di predefinito,
+anche con `--development`, il wizard mostra il passaggio Dischi dati (`GET /api/wizard/disks`,
+`axum/src/disks.rs`), che elenca i dischi interi interni senza il sistema, propone di inizializzare
+quelli vuoti e di cifrarli con la sola chiave automatica, perché nel wizard in HTTP non passano
+password. Le scelte arrivano a `post_wizard` in `disks.json` nella cartella di lavoro (nessun
+segreto) con `--disks`; `nas-wizard disks` le esegue con `nas-os-axum --initialize-storage` e
+`nas-os-axum --storage-crypt`, che ricontrollano disco e identità prima di cancellare; le chiavi
+stanno in `/run/nas-wizard-disks`. `WIZARD_DISKS_MODE=off` nell'unità nasconde il passaggio,
+`WIZARD_ENCRYPTION_MODE=off` toglie la proposta di cifratura.
 
 La password resta in memoria finché l'account non è creato, poi viene cancellata; né lei né il
 token compaiono mai nello stato che la pagina legge o nel journal.

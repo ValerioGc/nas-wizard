@@ -76,13 +76,6 @@ const connection = ref<WizardNetworks['connection'] | null>(null);
 const unreachable = ref('');
 const disks = ref<DisksOffer>({ enabled: false, encryption: false, disks: [] });
 const plans = ref<Record<string, DiskPlan>>({});
-// Where the installation is, as its step says, and whether the NAS is being opened.
-const progress = ref<WizardState | null>(null);
-const installer = ref<InstanceType<typeof WizardInstall> | null>(null);
-const leaving = ref(false);
-const canLogin = computed(
-  () => progress.value?.phase === 'done' && !progress.value.simulated && !leaving.value,
-);
 
 const steps = computed(() => (disks.value.enabled ? DISK_STEPS : STEPS));
 const step = computed(() => steps.value[position.value] ?? 'welcome');
@@ -209,13 +202,6 @@ async function finish() {
   }
 }
 
-/** Opens the sign-in of the NAS once the gateway answers in place of the wizard. */
-async function openLogin() {
-  leaving.value = true;
-  await installer.value?.openLogin();
-  leaving.value = false;
-}
-
 onMounted(load);
 
 </script>
@@ -228,12 +214,7 @@ onMounted(load);
         <CommonSpinner v-else :label="t('wizardLoading')" centered />
       </template>
 
-      <WizardInstall
-        v-else-if="installing"
-        ref="installer"
-        :initial="wizard"
-        @state="progress = $event"
-      />
+      <WizardInstall v-else-if="installing" :initial="wizard" />
 
       <template v-else>
         <WizardProgress v-if="position > 0" :current="position" :total="steps.length - 1" />
@@ -300,9 +281,9 @@ onMounted(load);
         <AlertBanner v-if="error" tone="error" compact>{{ error }}</AlertBanner>
       </template>
 
-      <template v-if="wizard" #actions>
+      <template v-if="wizard && !installing" #actions>
         <button
-          v-if="!installing && position > 0"
+          v-if="position > 0"
           type="button"
           :disabled="busy"
           data-testid="wizard_back"
@@ -313,19 +294,7 @@ onMounted(load);
         </button>
 
         <button
-          v-if="installing"
-          type="button"
-          class="primary"
-          :disabled="!canLogin"
-          data-testid="wizard_login"
-          @click="openLogin"
-        >
-          <CommonSpinner v-if="leaving" size="small" compact />
-          <CommonIcon v-else :src="arrowRightIcon" size="small" tinted />
-          {{ t('next') }}
-        </button>
-        <button
-          v-else-if="step === 'welcome'"
+          v-if="step === 'welcome'"
           type="button"
           class="primary"
           data-testid="wizard_start"
