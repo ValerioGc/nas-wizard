@@ -53,7 +53,7 @@ export default {
   wizardTokenTitle: 'Release token',
   wizardDisksTitle: 'Data disks',
   wizardDisksIntro:
-    'Empty disks to prepare for data. Disks with data stay as they are and appear in Explorer. This step is optional.',
+    'Empty disks to prepare for data. Disks with data stay as they are and appear in Files. This step is optional.',
   wizardDisksNone: 'No empty data disk is connected.',
   wizardDiskInUse: 'Already holds data: it stays as it is',
   wizardDiskKeep: 'Leave as it is',

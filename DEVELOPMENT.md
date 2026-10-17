@@ -88,7 +88,7 @@ I passi:
 | `handover`         | Dopo la conferma della pagina: chiude il listener, avvia il gateway, aspetta `/health`     |
 
 Il passo `disks` esiste sempre ma lavora solo se la pagina ha scelto dei dischi: di predefinito,
-anche con `--development`, il wizard mostra il passaggio Dischi dati (`GET /api/wizard/disks`,
+anche senza sistema cifrato, il wizard mostra il passaggio Dischi dati (`GET /api/wizard/disks`,
 `axum/src/disks.rs`), che elenca i dischi interi interni senza il sistema, propone di inizializzare
 quelli vuoti e di cifrarli con la sola chiave automatica, perché nel wizard in HTTP non passano
 password. Le scelte arrivano a `post_wizard` in `disks.json` nella cartella di lavoro (nessun

@@ -11,9 +11,10 @@ all'ultima versione, con il token dato durante la configurazione.
    NAS e lo estrae.
 2. Esegue `sudo ./install.sh`, lo script di avvio, che non chiede niente:
    - controlla che sistema, `/etc`, `/var/lib` e swap siano cifrati con LUKS e che ci sia un TPM
-     2.0 (`packages/pre_wizard/check-security.sh`), e se manca qualcosa si ferma prima di cambiare
-     la macchina; con `--update` e con `--development` avvisa soltanto, e `--development` lo annota
-     in `/var/lib/nas-wizard/security-development`, che il launcher segnala a ogni avvio;
+     2.0 (`packages/pre_wizard/check-security.sh`): se manca qualcosa avvisa soltanto e va avanti,
+     e scrive cosa ha trovato in `/var/lib/nas-wizard/security` (`system=encrypted|plain`,
+     `tpm=present|missing`), che il launcher segnala una volta e passa all'app Dischi.
+     `--development` resta accettato ma non serve più;
    - esegue quello che serve prima del wizard (`packages/pre_wizard`): la configurazione del sistema
      operativo (`packages/os_configuration`: pacchetti e firewall di base);
    - chiede a GitHub, senza token, se esiste un wizard più recente e, se c'è, lo scarica, lo verifica

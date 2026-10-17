@@ -212,47 +212,52 @@ else exit 0; fi`,
     expect(stdout).toContain('== Operating system');
   });
 
-  it('stops before changing anything on a machine without LUKS or TPM 2.0', () => {
-    const { code, output } = entry(['--dry-run'], undefined, {}, { plain: 'vg-root' });
-
-    expect(code).toBe(1);
-    expect(output).toContain('== Security of the machine');
-    expect(output).toContain('./install.sh --development');
-    expect(output).not.toContain('== Operating system');
-  });
-
-  it.each([['--update'], ['--development']])('only warns about the security with %s', (option) => {
-    const { code, stdout } = entry([option, '--dry-run'], undefined, {}, { tpm: '' });
+  it('only warns on a machine without LUKS or TPM 2.0, and installs anyway', () => {
+    const { code, stdout } = entry(['--dry-run'], undefined, {}, { plain: 'vg-root', tpm: '' });
 
     expect(code).toBe(0);
+    expect(stdout).toContain('== Security of the machine');
+    expect(stdout).toContain('/ is not on a disk encrypted with LUKS');
     expect(stdout).toContain('no TPM 2.0');
-    expect(stdout).toContain('going on without it');
+    expect(stdout).toContain('installation manual');
     expect(stdout).toContain('== Operating system');
   });
 
-  it('marks a NAS installed in development mode, and clears the mark when nothing is missing', () => {
+  it('still takes --development, which is no longer needed', () => {
+    const { code, stdout } = entry(['--development', '--dry-run'], undefined, {}, { tpm: '' });
+
+    expect(code).toBe(0);
+    expect(stdout).toContain('--development is no longer needed');
+    expect(stdout).toContain('== Operating system');
+  });
+
+  it('writes the state of the security for the launcher and drops the old mark', () => {
     const source = readFileSync(join(ROOT, 'install.sh'), 'utf8');
     const block = source.slice(
-      source.indexOf('if $update || $development; then'),
+      source.indexOf('check=(--warn-only)'),
       source.indexOf('\nif $dry_run; then\n  "$packages/pre_wizard/install.sh"'),
     );
-    const mark = join(temp.path, 'state', 'security-development');
-    const script = join(temp.path, 'mark.sh');
-    const checker = join(temp.path, 'packages', 'pre_wizard');
-    const marked = (outcome: number) => {
-      fakeCommand(temp.path, 'packages/pre_wizard/check-security.sh', `exit ${outcome}`);
-      writeFileSync(
-        script,
-        `set -euo pipefail\nupdate=false\ndevelopment=true\ndry_run=false\npackages=${temp.path}/packages\nDEVELOPMENT_MARK=${mark}\nfail() { echo "$1" >&2; exit 1; }\n${block}`,
-      );
-      expect(run(script).code).toBe(0);
-      return existsSync(mark);
-    };
-    mkdirSync(checker, { recursive: true });
+    const state = join(temp.path, 'state', 'security');
+    const old = join(temp.path, 'state', 'security-development');
+    const script = join(temp.path, 'state.sh');
+    mkdirSync(join(temp.path, 'state'), { recursive: true });
+    mkdirSync(join(temp.path, 'packages', 'pre_wizard'), { recursive: true });
+    writeFileSync(old, 'installed in development mode');
+    fakeCommand(
+      temp.path,
+      'packages/pre_wizard/check-security.sh',
+      'printf "%s\\n" "$@" > "$(dirname "$0")/arguments"; exit 3',
+    );
+    writeFileSync(
+      script,
+      `set -euo pipefail\ndry_run=false\npackages=${temp.path}/packages\nSECURITY_STATE=${state}\nOLD_DEVELOPMENT_MARK=${old}\nfail() { echo "$1" >&2; exit 1; }\n${block}`,
+    );
 
-    expect(marked(3)).toBe(true);
-    expect(readFileSync(mark, 'utf8')).toContain('development mode');
-    expect(marked(0)).toBe(false);
+    expect(run(script).code).toBe(0);
+    expect(readFileSync(join(temp.path, 'packages/pre_wizard/arguments'), 'utf8')).toBe(
+      `--warn-only\n--state\n${state}\n`,
+    );
+    expect(existsSync(old)).toBe(false);
   });
 
   it('runs on Debian 13 only', () => {

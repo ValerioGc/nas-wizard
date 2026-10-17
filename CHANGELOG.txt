@@ -9,6 +9,12 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- A system that is not on LUKS, or a machine without a TPM 2.0, no longer stops the installation:
+  the entry script says what is missing and goes on, and writes what it found in
+  `/var/lib/nas-wizard/security` for the launcher. `--development` is still accepted but no longer
+  needed, and the mark `security-development` goes. The installation manual explains in a note what
+  a NAS without an encrypted system or a TPM risks.
+- The step of the data disks names the app File instead of Explorer.
 - The step of the data disks and its encryption are on by default, in development mode too;
   `WIZARD_DISKS_MODE=off` and `WIZARD_ENCRYPTION_MODE=off` in the unit turn them off. Untested on a
   machine.

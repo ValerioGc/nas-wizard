@@ -131,3 +131,16 @@ h4 {
 .package_columns {
   columns: 2;
 }
+
+.info_note {
+  margin: 16px 0;
+  padding: 10px 16px;
+  border-left: 4px solid #c08a1e;
+  background: #fbf4e4;
+  page-break-inside: avoid;
+}
+
+.info_note p,
+.info_note ul {
+  margin: 6px 0;
+}

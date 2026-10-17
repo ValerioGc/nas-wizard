@@ -53,7 +53,7 @@ export default {
   wizardTokenTitle: 'Token delle release',
   wizardDisksTitle: 'Dischi dati',
   wizardDisksIntro:
-    'Dischi vuoti da preparare per i dati. I dischi con dati restano come sono e compaiono in Explorer. Il passaggio è facoltativo.',
+    'Dischi vuoti da preparare per i dati. I dischi con dati restano come sono e compaiono nell’app File. Il passaggio è facoltativo.',
   wizardDisksNone: 'Nessun disco dati vuoto collegato.',
   wizardDiskInUse: 'Contiene già dati: resta com’è',
   wizardDiskKeep: 'Lascia così',

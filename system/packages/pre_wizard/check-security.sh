@@ -5,25 +5,36 @@
 # live there, and a folder on another unencrypted partition would leave them readable), every swap
 # encrypted, and a TPM 2.0 on the board or in the CPU. It changes nothing.
 #
-#   check-security.sh               # exits 1 when something is missing
-#   check-security.sh --warn-only   # says what is missing and exits 3, 0 when nothing is
+#   check-security.sh                          # exits 1 when something is missing
+#   check-security.sh --warn-only              # says what is missing and exits 3, 0 when nothing is
+#   check-security.sh --warn-only --state FILE # also writes system= and tpm= in FILE
 #
-# The entry script runs it before it changes anything on the machine. A NAS already configured
-# (--update) and the development mode (--development) only get the warning.
+# The entry script runs it with --warn-only before it changes anything on the machine: a system
+# that is not encrypted is a choice of the person, explained in the installation manual, and the
+# NAS installs anyway. The state file tells the launcher, which warns once and has the app Dischi
+# say what an automatic key is worth on that machine.
 
 set -euo pipefail
 
 readonly TPM_CLASS=${NAS_TPM_CLASS:-/sys/class/tpm}
 
 warn_only=false
-case ${1:-} in
-  --warn-only) warn_only=true ;;
-  '') ;;
-  *)
-    printf 'error: unknown option: %s\n' "$1" >&2
-    exit 2
-    ;;
-esac
+state=''
+while (($#)); do
+  case $1 in
+    --warn-only) warn_only=true ;;
+    --state)
+      [[ -n ${2:-} ]] || { printf 'error: --state wants a file\n' >&2; exit 2; }
+      state=$2
+      shift
+      ;;
+    *)
+      printf 'error: unknown option: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 # Whether a block device lies on a LUKS container: one of the devices under it is one.
 on_luks() {
@@ -60,7 +71,14 @@ for version in "$TPM_CLASS"/tpm*/tpm_version_major; do
     tpm2=true
   fi
 done
+system=encrypted
+((${#missing[@]} == 0)) || system=plain
 $tpm2 || missing+=('no TPM 2.0: a chip on the board or the one of the CPU, enabled in the firmware')
+
+if [[ -n $state ]]; then
+  install -d -m 0755 -- "$(dirname -- "$state")"
+  printf 'system=%s\ntpm=%s\n' "$system" "$($tpm2 && echo present || echo missing)" >"$state"
+fi
 
 if ((${#missing[@]} == 0)); then
   echo '   system, /etc, /var/lib and swap encrypted with LUKS, TPM 2.0 present'
@@ -68,13 +86,13 @@ if ((${#missing[@]} == 0)); then
 fi
 printf '   missing: %s\n' "${missing[@]}"
 if $warn_only; then
-  echo '   going on without it: whoever takes a disk of this machine can read the NAS on it'
+  echo '   going on without it: whoever takes the disks of this machine can read the NAS on them.'
+  echo '   The installation manual explains what this means and how to encrypt the system.'
   exit 3
 fi
 cat >&2 <<'TEXT'
-error: the NAS needs Debian installed on an encrypted disk and a TPM 2.0. Install Debian again with
-the guided partitioning "use the entire disk and set up encrypted LVM", enable the TPM in the
-firmware, then run this script again: the installation manual shows how. To try the NAS on a
-machine without them, run ./install.sh --development.
+error: Debian is not installed on an encrypted disk with a TPM 2.0. Install Debian again with the
+guided partitioning "use the entire disk and set up encrypted LVM" and enable the TPM in the
+firmware: the installation manual shows how.
 TEXT
 exit 1

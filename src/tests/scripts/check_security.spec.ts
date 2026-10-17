@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -48,7 +49,7 @@ describe('check-security.sh', () => {
     expect(result.stdout).toContain('/ is not on a disk encrypted with LUKS');
     expect(result.stdout).toContain('/var/lib is not on a disk encrypted with LUKS');
     expect(result.stderr).toContain('encrypted LVM');
-    expect(result.stderr).toContain('./install.sh --development');
+    expect(result.stderr).not.toContain('--development');
   });
 
   it('wants every swap encrypted, a swap file on an encrypted disk', () => {
@@ -80,5 +81,21 @@ describe('check-security.sh', () => {
 
     expect(check({}, ['--warn-only']).code).toBe(0);
     expect(check({}, ['--everything']).code).toBe(2);
+    expect(check({}, ['--state']).code).toBe(2);
+  });
+
+  it('writes what it found for the launcher, the system and the TPM apart', () => {
+    const state = join(temp.path, 'state', 'security');
+    const read = () => readFileSync(state, 'utf8');
+
+    // The fake TPM stays once made: the machine without one comes first.
+    expect(check({ tpm: '' }, ['--warn-only', '--state', state]).code).toBe(3);
+    expect(read()).toBe('system=encrypted\ntpm=missing\n');
+    expect(check({}, ['--warn-only', '--state', state]).code).toBe(0);
+    expect(read()).toBe('system=encrypted\ntpm=present\n');
+    const plain = check({ plain: 'vg-root' }, ['--warn-only', '--state', state]);
+    expect(plain.code).toBe(3);
+    expect(plain.stdout).toContain('installation manual');
+    expect(read()).toBe('system=plain\ntpm=present\n');
   });
 });
