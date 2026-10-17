@@ -85,7 +85,7 @@ const props = withDefaults(defineProps<Props>(), { description: undefined, logo:
 .wizard_actions {
   justify-content: space-between;
 
-  :slotted(button:last-child) {
+  > :deep(button:last-child) {
     margin-left: auto;
   }
 }
@@ -93,7 +93,7 @@ const props = withDefaults(defineProps<Props>(), { description: undefined, logo:
 .wizard_step_intro .wizard_actions {
   justify-content: center;
 
-  :slotted(button:last-child) {
+  > :deep(button:last-child) {
     margin-left: 0;
   }
 }
