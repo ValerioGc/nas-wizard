@@ -1,5 +1,5 @@
-//! The data disks of the first configuration. 
-//! The empty whole internal disks the person may have initialized, encrypted or not, read from lsblk. 
+//! The data disks of the first configuration.
+//! The empty whole internal disks the person may have initialized, encrypted or not, read from lsblk.
 //! The wizard only proposes them. Once the launcher is installed,
 //! `nas-wizard disks` hands each choice to its root code (`nas-os-axum
 //! --initialize-storage`, `nas-os-axum --storage-crypt`), which checks the disk again, its

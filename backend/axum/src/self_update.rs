@@ -1,4 +1,4 @@
-//! `nas-wizard self-update --into <dir>`. 
+//! `nas-wizard self-update --into <dir>`.
 //! The entry script asks it whether a newer wizard has been
 //! released, before starting this one. A newer release is downloaded, checked and unpacked in a
 //! directory of its own, whose path is printed. The script then runs its entry script instead.

@@ -170,7 +170,7 @@ pub fn watch_inputs(inputs: &Path, activity: &Activity, reading: &Arc<Mutex<Hash
         let Ok(mut opened) = reading.lock() else {
             return;
         };
-        
+
         if !opened.insert(path.clone()) {
             continue;
         }
