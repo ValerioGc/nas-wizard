@@ -20,6 +20,7 @@ export function run(
 ): Run {
   const spawn = {
     encoding: 'utf8' as const,
+    stdio: 'pipe' as const,
     env: { ...process.env, ...options.env },
     input: options.input ?? '',
   };

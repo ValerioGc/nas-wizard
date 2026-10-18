@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
 <template>
   <span
     class="common_icon"
-    :class="[`common_icon_${props.size}`, { 'common_icon_tinted': props.tinted }]"
+    :class="[`common_icon_${props.size}`, { common_icon_tinted: props.tinted }]"
     :style="{ '--icon-source': `url(${JSON.stringify(props.src)})` }"
     :role="props.label ? 'img' : undefined"
     :aria-label="props.label"

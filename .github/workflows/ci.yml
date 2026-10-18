@@ -1,4 +1,4 @@
-# Tests of the wizard of nas-os on every pull request towards main, Dependabot's included. 
+# Tests of the wizard of nas-os on every pull request towards main, Dependabot's included.
 name: CI
 
 on:

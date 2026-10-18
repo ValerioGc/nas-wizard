@@ -15,7 +15,7 @@ const props = withDefaults(defineProps<Props>(), { description: undefined, logo:
 <template>
   <section
     class="app_panel wizard_step"
-    :class="{ 'wizard_step_intro': props.logo }"
+    :class="{ wizard_step_intro: props.logo }"
     :aria-label="props.title"
     data-testid="wizard_step"
   >

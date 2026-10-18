@@ -4,7 +4,6 @@ import type { WizardState } from '@/types/types';
 
 const { Given, When, Then } = createBdd();
 
-
 Given('the wizard opens on a NAS never configured', async ({ page }) => {
   await page.route('**/api/wizard/network/scan', (route) =>
     route.fulfill({

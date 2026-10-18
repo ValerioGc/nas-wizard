@@ -1,5 +1,5 @@
 // Builds the installation manual of the NAS in PDF, one chapter per numbered Markdown file, with
-// the version of the wizard. 
+// the version of the wizard.
 
 const {
   existsSync,

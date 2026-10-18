@@ -133,34 +133,43 @@ describe('install.sh', () => {
     expect(update.indexOf('exit 0')).toBeLessThan(update.indexOf('systemctl enable'));
   });
 
-  it('does not report a configured NAS when the wizard failed and an old gateway is active', () => {
-    const source = readFileSync(join(ROOT, 'install.sh'), 'utf8');
-    const finish = source.slice(source.indexOf('# An old gateway still running'));
-    const script = join(temp.path, 'finish.sh');
-    writeFileSync(
-      script,
-      `set -euo pipefail
+  it.each([
+    { result: 'exit-code', status: 1 },
+    { result: 'success', status: 1 },
+    { result: 'exit-code', status: 0 },
+  ])(
+    'does not report a configured NAS when the wizard failed ($result, exit $status) and an old gateway is active',
+    ({ result: unitResult, status }) => {
+      const source = readFileSync(join(ROOT, 'install.sh'), 'utf8');
+      const start = source.indexOf('\nresult=$(systemctl show "$UNIT" --property=Result --value)');
+      expect(start).toBeGreaterThanOrEqual(0);
+      const finish = source.slice(start);
+      const script = join(temp.path, 'finish.sh');
+      writeFileSync(
+        script,
+        `set -euo pipefail
 UNIT=nas-wizard
 address=10.0.2.15
 say() { echo "== $1"; }
 fail() { echo "error: $1" >&2; exit 1; }
 ${finish}`,
-    );
-    fakeCommand(
-      temp.path,
-      'systemctl',
-      `
-if [[ $* == *--property=Result* ]]; then echo exit-code;
-elif [[ $* == *--property=ExecMainStatus* ]]; then echo 1;
+      );
+      fakeCommand(
+        temp.path,
+        'systemctl',
+        `
+if [[ $* == *--property=Result* ]]; then echo ${unitResult};
+elif [[ $* == *--property=ExecMainStatus* ]]; then echo ${status};
 else exit 0; fi`,
-    );
-    fakeCommand(temp.path, 'journalctl', 'echo "Address already in use"');
-    const result = run(script, { env: { PATH: `${temp.path}:${process.env.PATH}` } });
-    expect(result.code).toBe(1);
-    expect(result.output).toContain('Address already in use');
-    expect(result.output).toContain('the wizard failed');
-    expect(result.output).not.toContain('the NAS is configured');
-  });
+      );
+      fakeCommand(temp.path, 'journalctl', 'echo "Address already in use"');
+      const result = run(script, { env: { PATH: `${temp.path}:${process.env.PATH}` } });
+      expect(result.code).toBe(1);
+      expect(result.output).toContain('Address already in use');
+      expect(result.output).toContain('the wizard failed');
+      expect(result.output).not.toContain('NAS configured');
+    },
+  );
 
   it('stops a running gateway before starting the wizard on its port', () => {
     const source = readFileSync(join(ROOT, 'install.sh'), 'utf8');
