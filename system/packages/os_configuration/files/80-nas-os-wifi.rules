@@ -1,0 +1,4 @@
+# A wireless card that appears after the boot check of nas-os-wifi.service (a USB key, a driver slow
+# to load) brings wpa_supplicant back at once. 
+# Installed by scripts/wifi.sh.
+ACTION=="add", SUBSYSTEM=="net", ENV{DEVTYPE}=="wlan", RUN+="/usr/local/lib/nas-os-configuration/wifi.sh"

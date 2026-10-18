@@ -1,0 +1,42 @@
+# The browser on the monitor connected to the NAS. The nas-os-screen.service starts it while a monitor is
+# connected and touched, and stops it when the monitor goes, into standby or when another console
+# comes in front (Ctrl+Alt+F2 to F6 reach the text login). It runs as nas-screen in a session of its
+# own on tty1, which gives it the screen, the keyboard and the mouse, and keeps its data in its
+# runtime directory Whenever it stops, for whatever reason, the text login comes back on tty1
+
+[Unit]
+Description=nas-os screen browser
+Documentation=https://github.com/ValerioGc/nas-wizard
+ConditionPathExists=/dev/tty1
+Wants=dbus.socket systemd-logind.service
+After=dbus.socket systemd-logind.service systemd-user-sessions.service getty@tty1.service
+Conflicts=getty@tty1.service
+PartOf=nas-os-screen.service
+
+[Service]
+Type=simple
+User=nas-screen
+PAMName=nas-os-screen
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+RuntimeDirectory=nas-os-screen
+RuntimeDirectoryMode=0700
+Environment=HOME=/run/nas-os-screen XDG_CONFIG_HOME=/run/nas-os-screen XDG_DATA_HOME=/run/nas-os-screen XDG_CACHE_HOME=/run/nas-os-screen
+ExecStartPre=/bin/bash -c 'until (exec 3<>/dev/tcp/127.0.0.1/8081) 2>/dev/null; do sleep 1; done'
+TimeoutStartSec=5min
+ExecStart=/usr/bin/cog --platform=drm http://127.0.0.1:8081/
+ExecStopPost=-+/usr/bin/systemctl --no-block start getty@tty1.service
+KillSignal=SIGKILL
+SuccessExitStatus=SIGKILL
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=-/run/user
+InaccessiblePaths=-/home -/root
+PrivateTmp=yes

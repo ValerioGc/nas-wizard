@@ -1,0 +1,4 @@
+# The session of the browser on the monitor of the NAS (nas-os-screen-browser.service)
+account  required  pam_unix.so
+session  required  pam_unix.so
+session  required  pam_systemd.so

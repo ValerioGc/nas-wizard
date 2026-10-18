@@ -1,0 +1,16 @@
+# wpa_supplicant only on a machine with a wireless card, looked at again at every boot.
+# Installed by scripts/wifi.sh.
+
+[Unit]
+Description=nas-os: wpa_supplicant only with a wireless card
+Documentation=https://github.com/ValerioGc/nas-wizard
+After=systemd-udev-trigger.service
+Before=NetworkManager.service wpa_supplicant.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/nas-os-configuration/wifi.sh
+
+[Install]
+WantedBy=multi-user.target

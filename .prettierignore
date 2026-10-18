@@ -1,0 +1,18 @@
+# Dependencies and generated files
+/node_modules/
+/dist/
+/backend/target/
+/backend/data/
+**/coverage/
+/release-assets/
+/test-results/
+/src/tests/e2e/.features-gen/
+/package-lock.json
+/pnpm-lock.yaml
+**/clippy-report.json
+/.scannerwork/
+
+# Local editor configuration
+/.vscode/
+
+*.vue

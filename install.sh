@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+#
+# The entry of the NAS. Run once, as root, from the unpacked package of the wizard on a Debian 13
+# just installed. Everything else happens from the browser.
+#
+#   sudo ./install.sh
+#   ./install.sh --dry-run        # prints what it would do, without doing it
+#   sudo ./install.sh --update    # the update of a configured NAS, run by the launcher
+#
+# It checks the machine (Debian 13, then the system on LUKS and a TPM 2.0, which only
+# warns. Then it installs the wizard on the machine (/usr/local/lib/nas-wizard, with
+# what runs after it and the configuration of the system) and starts it as the unit nas-wizard on port 80, so a closed SSH session or a
+# reboot does not stop it, and follows it until it hands the NAS over to the gateway. The unit
+# stays, disabled, once the NAS is configured, the factory reset of the launcher starts it again.
+# At its end the wizard empties this folder but for uninstall.sh, and puts the manuals in the home
+# of the user it creates.
+# The token of the private releases is given in the wizard, which runs what comes
+# after it (packages/post_wizard) with that token.
+#
+# With --update the NAS is already configured, the launcher runs it from a newer package, when it
+# updates the NAS or before its factory reset. It configures the operating system again, which is
+# idempotent and brings the changes of the release (the firewall, for one), and puts the new wizard
+# in place.
+
+set -euo pipefail
+
+here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+readonly UNIT=nas-wizard
+readonly PORT=${NAS_WIZARD_PORT:-80}
+readonly WIZARD=$here/wizard/bin/nas-wizard
+readonly UPDATES=${NAS_WIZARD_UPDATES:-/var/lib/nas-wizard-updates}
+readonly INSTALLED=${NAS_WIZARD_HOME:-/usr/local/lib/nas-wizard}
+readonly UNIT_FILE=${NAS_WIZARD_UNIT_FILE:-/etc/systemd/system/$UNIT.service}
+readonly OS_RELEASE=${NAS_OS_RELEASE:-/etc/os-release}
+readonly SECURITY_STATE=${NAS_SECURITY_STATE:-/var/lib/nas-wizard/security}
+readonly OLD_DEVELOPMENT_MARK=${NAS_DEVELOPMENT_MARK:-/var/lib/nas-wizard/security-development}
+readonly SCREEN_UNIT=nas-os-screen.service
+readonly SCREEN_UNIT_FILE=${NAS_SCREEN_UNIT_FILE:-/etc/systemd/system/$SCREEN_UNIT}
+packages=$here/packages
+[[ -d $packages ]] || packages=$here/system/packages
+readonly packages
+
+say() { printf '\n== %s\n' "$1"; }
+fail() {
+  printf 'error: %s\n' "$1" >&2
+  exit 1
+}
+
+dry_run=false
+update=false
+for option in "$@"; do
+  case $option in
+    --dry-run) dry_run=true ;;
+    --update) update=true ;;
+    --development) echo 'note: --development is no longer needed, the security check only warns' ;;
+    *) fail "unknown option: $option" ;;
+  esac
+done
+
+$dry_run || [[ $EUID -eq 0 ]] || fail "it has to run as root: sudo $0"
+[[ -x $WIZARD ]] || $dry_run || fail "$WIZARD is missing: run this script from the unpacked package"
+command -v systemctl >/dev/null || fail 'systemd is not available on this machine'
+version=$(. "$OS_RELEASE" 2>/dev/null && printf '%s %s' "${ID:-}" "${VERSION_ID:-}") || version=''
+[[ $version == 'debian 13' ]] || fail "this NAS runs on Debian 13, not on '${version:-an unknown system}'"
+$dry_run && printf '\nDry run: no change will be applied.\n'
+
+say "Security of the machine"
+check=(--warn-only)
+$dry_run || check+=(--state "$SECURITY_STATE")
+set +e
+"$packages/pre_wizard/check-security.sh" "${check[@]}"
+outcome=$?
+set -e
+((outcome == 0 || outcome == 3)) || fail 'the security of the machine could not be checked'
+$dry_run || rm -f -- "$OLD_DEVELOPMENT_MARK"
+
+if $dry_run; then
+  "$packages/pre_wizard/install.sh" --dry-run
+else
+  "$packages/pre_wizard/install.sh"
+fi
+
+say "Version of the wizard"
+if $update; then
+  echo "   no search for a newer one: the launcher chose this wizard"
+elif $dry_run; then
+  echo "   [dry run] $WIZARD self-update --into $UPDATES"
+elif [[ -n ${NAS_WIZARD_UPDATED:-} ]]; then
+  echo "   $("$WIZARD" --version), just downloaded"
+else
+  set +e
+  newer=$("$WIZARD" self-update --into "$UPDATES")
+  outcome=$?
+  set -e
+  case $outcome in
+    0)
+      echo "   a newer wizard is out: running $newer/install.sh"
+      exec env NAS_WIZARD_UPDATED=1 NAS_WIZARD_ORIGIN="$here" bash "$newer/install.sh" "$@"
+      ;;
+    3) echo "   $("$WIZARD" --version) is the latest" ;;
+    *) echo "   warning: the latest version could not be read, going on with this one" ;;
+  esac
+fi
+
+say "Wizard"
+package=${NAS_WIZARD_ORIGIN:-$here}
+$update && package=$INSTALLED
+unit() {
+  cat <<UNIT
+[Unit]
+Description=nas-os wizard, the first configuration of the NAS
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$INSTALLED/wizard/bin/nas-wizard
+StateDirectory=nas-wizard
+Environment=WIZARD_MODE=real
+Environment=WIZARD_ADDRESS=0.0.0.0
+Environment=WIZARD_PORT=$PORT
+Environment=WIZARD_SCREEN_PORT=8081
+Environment=WIZARD_UI_DIR=$INSTALLED/wizard/ui
+Environment="NAS_WIZARD_PACKAGE=$package"
+Environment=TOKIO_WORKER_THREADS=2 MALLOC_ARENA_MAX=2
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+}
+if $dry_run; then
+  echo "   [dry run] install the wizard in $INSTALLED, write $UNIT_FILE and start $UNIT:"
+  unit | sed 's/^/     /'
+  exit 0
+fi
+load=$(systemctl show "$UNIT" --property=LoadState --value)
+if [[ $load != not-found ]]; then systemctl stop "$UNIT"; fi
+
+install -d -m 0755 "$(dirname "$INSTALLED")"
+staging=$(mktemp -d "$(dirname "$INSTALLED")/.nas-wizard.XXXXXX")
+chmod 0755 "$staging"
+trap 'rm -rf -- "$staging"' EXIT
+install -d -m 0755 "$staging/packages"
+cp -a "$here/wizard" "$staging/wizard"
+cp -a "$packages/post_wizard" "$staging/packages/post_wizard"
+cp -a "$packages/os_configuration" "$staging/packages/os_configuration"
+for manual in "$here"/nas_os_installation_manual_*.pdf; do
+  [[ -f $manual ]] && install -m 0644 "$manual" "$staging/"
+done
+[[ -x $staging/wizard/bin/nas-wizard ]] || fail 'the new wizard has no executable binary'
+previous=$INSTALLED.previous
+[[ ! -e $previous ]] || fail "previous installation still exists: $previous"
+if [[ -e $INSTALLED ]]; then mv -- "$INSTALLED" "$previous"; fi
+if ! mv -- "$staging" "$INSTALLED"; then
+  if [[ -e $previous ]]; then mv -- "$previous" "$INSTALLED"; fi
+  fail 'the new wizard could not be installed; the previous installation was retained'
+fi
+trap - EXIT
+rm -rf -- "$previous"
+unit >"$UNIT_FILE"
+chmod 0644 "$UNIT_FILE"
+systemctl daemon-reload
+
+if [[ -f $SCREEN_UNIT_FILE ]] && systemctl is-enabled --quiet "$SCREEN_UNIT"; then
+  systemctl restart "$SCREEN_UNIT"
+fi
+if $update; then
+  echo "   the wizard $("$INSTALLED/wizard/bin/nas-wizard" --version) is installed in $INSTALLED"
+  exit 0
+fi
+
+systemctl enable --quiet "$UNIT"
+if systemctl is-active --quiet nas-os-gateway; then
+  systemctl stop nas-os-gateway
+fi
+systemctl start "$UNIT"
+
+address=$(hostname -I 2>/dev/null | awk '{print $1}') || address=''
+port_suffix=''
+[[ $PORT == 80 ]] || port_suffix=:$PORT
+cat <<EOF
+
+   Configuration page http://${address:-<address of this machine>}${port_suffix}/setup, from a browser on the same network.
+   Wizard installed in $INSTALLED. At the end this folder keeps only uninstall.sh.
+   Closing this terminal does not stop the wizard.
+
+EOF
+
+journalctl --unit="$UNIT" --follow --output=cat --lines=0 &
+follower=$!
+trap 'kill "$follower" 2>/dev/null || true' EXIT
+while systemctl is-active --quiet "$UNIT"; do
+  sleep 2
+done
+
+result=$(systemctl show "$UNIT" --property=Result --value)
+status=$(systemctl show "$UNIT" --property=ExecMainStatus --value)
+if [[ $result != success || $status != 0 ]]; then
+  journalctl --unit="$UNIT" --output=cat --lines=40 --no-pager >&2
+  fail "the wizard failed ($result, exit $status), the NAS is not configured"
+fi
+
+say "Done"
+if systemctl is-active --quiet nas-os-gateway; then
+  echo "   NAS configured, available at http://${address:-<address of this machine>}/"
+else
+  if [[ -f $here/install.sh ]]; then
+    echo "   the wizard ended before the handover, running this script again restarts it"
+  else
+    echo "   the wizard ended before the handover, sudo systemctl start $UNIT restarts it"
+  fi
+  exit 1
+fi

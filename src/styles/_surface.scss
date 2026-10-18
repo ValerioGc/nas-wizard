@@ -1,0 +1,71 @@
+@use '@/styles/global' as *;
+
+.app_surface {
+  color: var(--theme-foreground);
+  font: #{$text_base}/ 1.5 $font_ui;
+  min-width: 0;
+
+  h1,
+  h2 {
+    font-size: $text_large;
+    font-weight: 650;
+  }
+
+  h3 {
+    font-size: $text_base;
+  }
+
+  button {
+    @extend %button;
+  }
+
+  input:not([type='checkbox']):not([type='range']):not([type='color']) {
+    @extend %control;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $space_2;
+  }
+
+  img {
+    object-fit: contain;
+  }
+
+  .primary {
+    background: $color_primary;
+    color: $color_on_primary;
+
+    &:hover:not(:disabled) {
+      background: $color_primary_hover;
+    }
+  }
+
+  .app_error {
+    color: var(--status-error);
+  }
+
+  .muted {
+    @extend %muted;
+  }
+
+  .app_toolbar {
+    @extend %fx_base;
+    flex-wrap: wrap;
+    gap: $space_2;
+  }
+
+  .app_panel {
+    @extend %panel;
+    padding: $space_4;
+  }
+
+  .app_list {
+    @extend %stack;
+    gap: $space_2;
+  }
+}
