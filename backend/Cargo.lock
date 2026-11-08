@@ -719,7 +719,7 @@ dependencies = [
 
 [[package]]
 name = "nas-wizard-axum"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "axum",
  "futures-util",

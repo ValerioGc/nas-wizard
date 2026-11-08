@@ -1,6 +1,6 @@
 {
   "name": "nas-wizard",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "description": "Wizard for the configuration and installation of NAS OS",
