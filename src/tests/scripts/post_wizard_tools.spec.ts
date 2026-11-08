@@ -20,7 +20,21 @@ const RESTART = join(TOOLS, 'nas-restart.sh');
 
 let temp: ReturnType<typeof workspace>;
 let server: ChildProcess | undefined;
-let ports = 0;
+
+const FAKE_SERVICE = `
+  const fake = require('node:http').createServer((_, answer) => answer.end('ok'));
+  fake.listen(0, () => {
+    require('node:fs').writeFileSync(process.argv[1], String(fake.address().port));
+  });
+`;
+
+const FREE_PORT = `
+  const probe = require('node:net').createServer();
+  probe.listen(0, () => {
+    console.log(probe.address().port);
+    probe.close();
+  });
+`;
 
 beforeEach(() => {
   temp = workspace();
@@ -34,21 +48,20 @@ afterEach(() => {
 
 /** A port that answers 200 on /health, standing for the launcher and the gateway. */
 function healthy() {
-  const port = 41_000 + (process.pid % 9_000) + (ports += 1);
-  server = spawn(process.execPath, [
-    '-e',
-    `require('node:http').createServer((_, answer) => answer.end('ok')).listen(${port})`,
-  ]);
+  const written = join(temp.path, 'service-port');
+  server = spawn(process.execPath, ['-e', FAKE_SERVICE, written]);
   execFileSync('bash', [
     '-c',
-    `for i in {1..150}; do (exec 3<>/dev/tcp/127.0.0.1/${port}) 2>/dev/null && exit 0; sleep 0.1; done; exit 1`,
+    'for i in {1..150}; do [[ -s "$1" ]] && exit 0; sleep 0.1; done; exit 1',
+    'wait-for-service',
+    written,
   ]);
-  return port;
+  return Number(readFileSync(written, 'utf8'));
 }
 
 /** A free port, where nothing answers. */
 function silent() {
-  return 41_000 + (process.pid % 9_000) + (ports += 1);
+  return Number(execFileSync(process.execPath, ['-e', FREE_PORT], { encoding: 'utf8' }));
 }
 
 /** Fakes of systemd and of the system, which record each call. */
@@ -104,7 +117,6 @@ function machine(options: { updating?: boolean; apps?: string; wizard?: boolean 
   };
 }
 
-/** What neither tool may ever touch, so the console and SSH keep working. */
 const DEBIAN =
   /systemctl (start|stop|restart|reload|enable|disable|mask)[^\n]*(ssh|getty|NetworkManager|networking|systemd-networkd|polkit)/;
 
