@@ -17,19 +17,17 @@ const LISTED: &str = r#"{"blockdevices":[
   {"name":"sr0","path":"/dev/sr0","type":"rom","size":1}
 ]}"#;
 
-fn offer(encryption: bool) -> Offer {
+fn offer() -> Offer {
     Offer {
         enabled: true,
-        encryption,
         disks: parse(LISTED).expect("listed"),
     }
 }
 
-fn choice(device: &str, identity: &str, encrypt: bool) -> Choice {
+fn choice(device: &str, identity: &str) -> Choice {
     Choice {
         device: device.to_owned(),
         identity: identity.to_owned(),
-        encrypt,
     }
 }
 
@@ -57,46 +55,41 @@ fn a_choice_is_an_empty_disk_listed_now_with_its_identity() {
         &[],
         &Offer {
             enabled: false,
-            encryption: false,
             disks: Vec::new()
         }
     )
     .is_ok());
-    assert!(check(&[choice("sdb", "0x5001/D1/2000", true)], &offer(true)).is_ok());
+    assert!(check(&[choice("sdb", "0x5001/D1/2000")], &offer()).is_ok());
 
     for (choices, reason) in [
-        (vec![choice("sdb", "0x5001/D1/2000", true)], "encryption"),
-        (vec![choice("sdc", "/D2/3000", false)], "not the empty disk"),
-        (vec![choice("sdb", "/D9/2000", false)], "not the empty disk"),
-        (vec![choice("sda", "/SYS/500", false)], "not a data disk"),
+        (vec![choice("sdc", "/D2/3000")], "not the empty disk"),
+        (vec![choice("sdb", "/D9/2000")], "not the empty disk"),
+        (vec![choice("sda", "/SYS/500")], "not a data disk"),
         (
             vec![
-                choice("sdb", "0x5001/D1/2000", false),
-                choice("sdb", "0x5001/D1/2000", false),
+                choice("sdb", "0x5001/D1/2000"),
+                choice("sdb", "0x5001/D1/2000"),
             ],
             "twice",
         ),
     ] {
-        let refused = check(&choices, &offer(false)).expect_err("refused");
+        let refused = check(&choices, &offer()).expect_err("refused");
         assert!(refused.contains(reason), "{refused}");
     }
     let off = Offer {
         enabled: false,
-        ..offer(true)
+        ..offer()
     };
-    assert!(check(&[choice("sdb", "0x5001/D1/2000", false)], &off).is_err());
+    assert!(check(&[choice("sdb", "0x5001/D1/2000")], &off).is_err());
 }
 
 #[test]
 fn each_choice_becomes_the_request_of_the_launcher() {
-    let encrypted = request(&choice("nvme0n1", "w/s/1", true));
-    assert_eq!(encrypted["op"], "format");
-    assert_eq!(encrypted["automatic"], true);
-    assert_eq!(encrypted["label"], "Data-nvme0n1");
-    assert!(encrypted.get("password").is_none());
-    let plain = request(&choice("sdb", "w/s/1", false));
+    let plain = request(&choice("nvme0n1", "w/s/1"));
     assert!(plain.get("op").is_none());
+    assert!(plain.get("encrypt").is_none());
     assert_eq!(plain["identity"], "w/s/1");
+    assert_eq!(plain["label"], "Data-nvme0n1");
     assert_eq!(label("averyveryverylongname").len(), 16);
 }
 
@@ -110,19 +103,17 @@ async fn prepares_each_disk_with_the_launcher_and_stops_at_the_first_failure() {
     std::fs::write(
         &launcher,
         format!(
-            "#!/usr/bin/env bash\nprintf '%s %s\\n' \"$*\" \"$RUNTIME_DIRECTORY\" >> {calls}\n\
-             [[ $1 == --storage-crypt ]] && {{ cat >> {calls}; echo; echo '{{}}'; }}\n\
+            "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" >> {calls}\n\
              [[ $1 == --initialize-storage && $(cat \"$2\") == *sdz* ]] && exit 1\nexit 0\n",
             calls = calls.display()
         ),
     )
     .expect("launcher");
     std::fs::set_permissions(&launcher, std::fs::Permissions::from_mode(0o755)).expect("mode");
-    std::env::set_var("NAS_WIZARD_RUNTIME", directory.join("runtime"));
     let list = directory.join("disks.json");
     std::fs::write(
         &list,
-        r#"[{"device":"sdb","identity":"w/s/1","encrypt":true},{"device":"sdc","identity":"w/s/2","encrypt":false}]"#,
+        r#"[{"device":"sdb","identity":"w/s/1"},{"device":"sdc","identity":"w/s/2"}]"#,
     )
     .expect("list");
 
@@ -131,24 +122,25 @@ async fn prepares_each_disk_with_the_launcher_and_stops_at_the_first_failure() {
         .expect("prepared");
     assert_eq!(done, ["sdb", "sdc"]);
     let recorded = std::fs::read_to_string(&calls).expect("calls");
-    assert!(recorded.contains(&format!(
-        "--storage-crypt {}",
-        directory.join("runtime").display()
-    )));
-    assert!(recorded.contains(r#""op":"format""#));
-    assert!(recorded.contains("--initialize-storage"));
-    assert!(!directory.join("runtime").exists());
+    assert_eq!(recorded.matches("--initialize-storage").count(), 2);
+    assert!(!recorded.contains("--storage-crypt"));
     assert!(!directory.join("disk-initialize.json").exists());
 
     std::fs::write(
         &list,
-        r#"[{"device":"sdz","identity":"w/s/3","encrypt":false},{"device":"sdy","identity":"w/s/4","encrypt":false}]"#,
+        r#"[{"device":"sdz","identity":"w/s/3"},{"device":"sdy","identity":"w/s/4"}]"#,
     )
     .expect("list");
     let failed = prepare(&list, &launcher, &directory)
         .await
         .expect_err("failed");
     assert!(failed.contains("sdz"));
+    std::fs::write(
+        &list,
+        r#"[{"device":"sdb","identity":"w/s/1","encrypt":true}]"#,
+    )
+    .expect("list");
+    assert!(prepare(&list, &launcher, &directory).await.is_err());
     std::fs::write(&list, "not json").expect("list");
     assert!(prepare(&list, &launcher, &directory).await.is_err());
     std::fs::remove_dir_all(&directory).expect("removed");

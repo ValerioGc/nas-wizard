@@ -27,7 +27,6 @@ fn offline() -> (Config, PathBuf) {
         post_script: PathBuf::from("/nonexistent/install.sh"),
         binary: PathBuf::from("nas-wizard"),
         disks: false,
-        encryption: false,
         launcher_binary: PathBuf::from("/nonexistent/nas-os-axum"),
     };
     (config, state_dir)

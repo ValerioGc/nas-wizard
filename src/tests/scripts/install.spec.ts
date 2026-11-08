@@ -19,6 +19,9 @@ const scripts = [
   join(ROOT, 'system/packages/pre_wizard/check-security.sh'),
   join(ROOT, 'system/packages/post_wizard/install.sh'),
   join(ROOT, 'system/packages/post_wizard/clean-package.sh'),
+  join(ROOT, 'system/packages/post_wizard/tools.sh'),
+  join(ROOT, 'system/packages/post_wizard/tools/nas-status.sh'),
+  join(ROOT, 'system/packages/post_wizard/tools/nas-restart.sh'),
   ...[
     'install.sh',
     'scripts/system-packages.sh',

@@ -13,7 +13,8 @@
 # reboot does not stop it, and follows it until it hands the NAS over to the gateway. The unit
 # stays, disabled, once the NAS is configured, the factory reset of the launcher starts it again.
 # At its end the wizard empties this folder but for uninstall.sh, and puts the manuals in the home
-# of the user it creates.
+# of the user it creates. The console tools (packages/post_wizard/tools) go to ~/nas-tools of the
+# person who ran this script with sudo, never with --update.
 # The token of the private releases is given in the wizard, which runs what comes
 # after it (packages/post_wizard) with that token.
 #
@@ -168,6 +169,12 @@ if $update; then
   echo "   the wizard $("$INSTALLED/wizard/bin/nas-wizard" --version) is installed in $INSTALLED"
   exit 0
 fi
+
+# The console tools go to the person who ran this script with sudo, who logs in over SSH or at the
+# console. They never decide the outcome of the installation.
+say "Console tools"
+bash "$INSTALLED/packages/post_wizard/tools.sh" --install "${SUDO_USER:-root}" ||
+  echo '   warning: the console tools could not be copied'
 
 systemctl enable --quiet "$UNIT"
 if systemctl is-active --quiet nas-os-gateway; then

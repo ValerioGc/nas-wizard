@@ -282,6 +282,8 @@ describe('removing what the configuration installed', () => {
     expect(stdout).not.toContain('apt-get autoremove');
     expect(stdout).not.toContain('apt-get clean');
     expect(stdout).toContain('systemctl enable nas-os-base-firewall.service');
+    expect(stdout).toContain('systemctl reload-or-restart nas-os-base-firewall.service');
+    expect(stdout).not.toContain('systemctl restart nas-os-base-firewall.service');
     expect(new Set(readFileSync(join(state(), 'packages'), 'utf8').trim().split('\n'))).toEqual(
       new Set([
         'nftables',
@@ -300,7 +302,7 @@ describe('removing what the configuration installed', () => {
         join(temp.path, 'root', 'etc/systemd/system/nas-os-base-firewall.service'),
         'utf8',
       ),
-    ).toContain('ExecStart=/usr/local/lib/nas-os-configuration/base-firewall.sh');
+    ).toContain('ExecReload=/usr/local/lib/nas-os-configuration/base-firewall.sh');
   });
 
   it('removes those packages, once each, and nothing that is not a package name', () => {
@@ -634,12 +636,27 @@ describe('uninstall.sh', () => {
       '$GATEWAY_TOOLS/uninstall.sh" --purge',
       '$configuration/scripts/screen.sh" --remove',
       '$configuration/scripts/wifi.sh" --remove',
+      'post_wizard/tools.sh" --remove',
       '$configuration/scripts/uninstall.sh"\n',
       'rm -rf -- "$WIZARD_HOME"',
     ].map((step) => script.indexOf(step));
 
     expect(order.every((position) => position > 0)).toBe(true);
     expect(order).toEqual([...order].sort((left, right) => left - right));
+  });
+
+  it('waits for an update and its check, and goes on when the terminal goes away', () => {
+    const script = readFileSync(join(OS_CONFIGURATION, '..', 'uninstall.sh'), 'utf8');
+
+    expect(script).toContain("'nas-os-update-verify.service'");
+    expect(script).toContain('/var/lib/nas-os/update-verify/pending');
+    const detach = script.indexOf('systemd-run --unit="$JOB"');
+    expect(detach).toBeGreaterThan(script.indexOf('busy=$('));
+    expect(detach).toBeGreaterThan(script.indexOf("read -r -p \"Type 'delete'"));
+    expect(detach).toBeLessThan(script.indexOf('say "Stop NAS services"'));
+    expect(script).toContain('--setenv=NAS_UNINSTALL_DETACHED=1');
+    expect(script).toContain('StandardOutput=append:"$LOG"');
+    expect(script).toContain('/bin/bash "$self" --yes');
   });
 
   it('alone in the emptied package, takes the configuration of the system from the installed wizard', () => {

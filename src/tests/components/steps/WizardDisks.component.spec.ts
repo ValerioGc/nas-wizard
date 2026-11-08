@@ -4,19 +4,18 @@ import WizardDisks from '@/components/steps/WizardDisks.vue';
 import { setLocale } from '@/i18n';
 import type { DiskPlan, WizardDisks as Offer } from '@/types/types';
 
-const offer = (encryption: boolean): Offer => ({
+const offer = (): Offer => ({
   enabled: true,
-  encryption,
   disks: [
     { device: 'sdb', size: 2e12, model: 'Data Disk', identity: 'w/s/1', empty: true },
     { device: 'sdc', size: 1e12, model: null, identity: 'w/s/2', empty: false },
   ],
 });
 
-function disks(encryption: boolean, plans: Record<string, DiskPlan> = {}) {
+function disks(plans: Record<string, DiskPlan> = {}) {
   return mount(WizardDisks, {
     props: {
-      offer: offer(encryption),
+      offer: offer(),
       modelValue: plans,
       'onUpdate:modelValue': (value: Record<string, DiskPlan>) =>
         wrapper.setProps({ modelValue: value }),
@@ -28,8 +27,8 @@ let wrapper: ReturnType<typeof disks>;
 beforeEach(() => setLocale('en'));
 
 describe('WizardDisks', () => {
-  it('offers to initialize only the empty disks, encrypted where the wizard can', async () => {
-    wrapper = disks(false);
+  it('offers to initialize only the empty disks, never encrypted', async () => {
+    wrapper = disks();
 
     expect(wrapper.text()).toContain('/dev/sdb');
     expect(wrapper.text()).toContain('2000 GB');
@@ -42,20 +41,20 @@ describe('WizardDisks', () => {
     expect(wrapper.text()).toContain('erases all of its content');
   });
 
-  it('explains how an encrypted disk opens', () => {
-    wrapper = disks(true, { sdb: 'encrypted' });
+  it('says that the encryption is set up later in the Disks app', () => {
+    wrapper = disks({ sdb: 'plain' });
 
-    expect(
-      wrapper.get('[data-testid="wizard_disk_sdb_encrypted"]').attributes('aria-pressed'),
-    ).toBe('true');
-    expect(wrapper.text()).toContain('unlocks by itself at startup');
+    expect(wrapper.get('[data-testid="wizard_disks_encryption_note"]').text()).toContain(
+      'Disks app',
+    );
   });
 
   it('says when no data disk is connected', () => {
     wrapper = mount(WizardDisks, {
-      props: { offer: { enabled: true, encryption: false, disks: [] }, modelValue: {} },
+      props: { offer: { enabled: true, disks: [] }, modelValue: {} },
     });
 
     expect(wrapper.text()).toContain('No empty data disk');
+    expect(wrapper.find('[data-testid="wizard_disks_encryption_note"]').exists()).toBe(false);
   });
 });

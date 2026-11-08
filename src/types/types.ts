@@ -86,18 +86,16 @@ export interface WizardDisk {
 // The step of the data disks, which the wizard may have off.
 export interface WizardDisks {
   enabled: boolean;
-  encryption: boolean;
   disks: WizardDisk[];
 }
 
 // What becomes of an empty disk
-export type DiskPlan = 'keep' | 'plain' | 'encrypted';
+export type DiskPlan = 'keep' | 'plain';
 
 // An empty disk to initialize, as the page sends it.
 export interface DiskChoice {
   device: string;
   identity: string;
-  encrypt: boolean;
 }
 
 // What the end of the installation offers to download: the authority of the NAS for HTTPS.

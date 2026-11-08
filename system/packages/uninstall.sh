@@ -11,7 +11,6 @@
 #
 #   sudo ./uninstall.sh          # asks to type 'delete' first
 #   sudo ./uninstall.sh --yes    # without asking
-
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -26,6 +25,7 @@ readonly WIZARD_UNIT=${NAS_WIZARD_UNIT_FILE:-/etc/systemd/system/nas-wizard.serv
 
 # Where the entry script unpacks a newer wizard it found.
 readonly WIZARD_UPDATES=/var/lib/nas-wizard-updates
+readonly LOG=${NAS_UNINSTALL_LOG:-/var/log/nas-os-uninstall.log}
 
 configuration=$here/os_configuration
 [[ -d $configuration ]] || configuration=$WIZARD_HOME/packages/os_configuration
@@ -57,16 +57,54 @@ This removes from the machine:
   - the wizard installed on the machine and its unit
   - the screen for a monitor connected to the NAS
   - the base firewall, the wireless check and the Debian packages the OS configuration installed
+  - the console tools in ~/nas-tools, only their files
 TEXT
+  if command -v nmcli >/dev/null; then
+    managed=$(nmcli -t -f DEVICE,STATE device 2>/dev/null | awk -F: '$2 == "connected" { print $1 }' |
+      paste -sd ' ' -)
+    if [[ -n $managed ]]; then
+      printf '\nNetworkManager brought up %s. They go down when it is removed, until the next start\n' "$managed"
+      printf 'brings back the network of before. An SSH session over them drops, the removal goes on\n'
+      printf 'and writes what it does into %s.\n\n' "$LOG"
+    fi
+  fi
   read -r -p "Type 'delete' to confirm: " answer
   [[ $answer == delete ]] || fail 'cancelled: nothing was removed'
 fi
 
 busy=$(systemctl list-units --plain --no-legend --state=active,activating,deactivating,reloading \
-  'nas-os-reset.service' 'nas-os-update.service' 'nas-os-apt@*.service' 'nas-os-app-packages@*.service' \
+  'nas-os-reset.service' 'nas-os-update.service' 'nas-os-update-verify.service' 'nas-os-apt@*.service' 'nas-os-app-packages@*.service' \
   'nas-os-storage-initialize.service' 'nas-os-storage-rename.service' 'nas-os-storage-eject.service' \
   'nas-os-storage-crypt@*.service')
 [[ -z $busy ]] || fail 'wait for NAS reset, updates, package installation or disk operations before uninstalling'
+[[ ! -e /var/lib/nas-os/update-verify/pending ]] ||
+  fail 'an update waits for its check after the restart, restart the NAS first, nothing was removed'
+
+# From here on the removal runs as a unit of its own, so it goes to its end also when the terminal
+# or the SSH session goes away. This terminal only follows its log.
+readonly JOB=nas-os-uninstall.service
+if [[ ${NAS_UNINSTALL_DETACHED:-} != 1 ]]; then
+  self=$(readlink -f -- "${BASH_SOURCE[0]}")
+  install -m 0600 /dev/null "$LOG"
+  systemctl reset-failed "$JOB" 2>/dev/null || true
+  systemd-run --unit="$JOB" --service-type=exec --quiet --setenv=NAS_UNINSTALL_DETACHED=1 \
+    --property=StandardOutput=append:"$LOG" --property=StandardError=append:"$LOG" \
+    /bin/bash "$self" --yes || fail 'the removal could not be started, nothing was removed'
+  printf 'The removal runs as %s and goes on if this terminal closes. Its log is %s\n' "$JOB" "$LOG"
+  tail -n +1 -F -- "$LOG" 2>/dev/null &
+  follower=$!
+  trap 'kill "$follower" 2>/dev/null || true' EXIT
+  while [[ $(systemctl show -p ActiveState --value "$JOB") =~ ^(active|activating|deactivating)$ ]]; do
+    sleep 1
+  done
+  sleep 1
+
+  result=$(systemctl show -p Result --value "$JOB")
+  systemctl reset-failed "$JOB" 2>/dev/null || true
+  [[ $result == success ]] || fail "the removal did not end ($result), see $LOG"
+  exit 0
+fi
+printf '\n== Removal of the NAS, %s\n' "$(date '+%F %T')"
 
 say "Stop NAS services"
 for unit in nas-os.service nas-os-gateway.service nas-wizard.service nas-os-storage.timer; do
@@ -104,6 +142,13 @@ say "Screen"
 
 say "Wireless check"
 "$configuration/scripts/wifi.sh" --remove
+
+say "Console tools"
+if [[ -f $WIZARD_HOME/packages/post_wizard/tools.sh ]]; then
+  bash "$WIZARD_HOME/packages/post_wizard/tools.sh" --remove || echo '   warning: the console tools stay'
+else
+  echo '   none'
+fi
 
 say "System packages"
 "$configuration/scripts/uninstall.sh"

@@ -307,7 +307,6 @@ async fn no_disk_is_chosen_while_the_step_of_the_disks_is_off() {
     input.disks = vec![crate::disks::Choice {
         device: "sdb".to_owned(),
         identity: "w/s/1".to_owned(),
-        encrypt: false,
     }];
 
     let refused = start(&state, input).await.expect_err("refused");
@@ -333,7 +332,6 @@ fn the_script_gets_the_list_of_the_disks_when_some_were_chosen() {
     request.disks = vec![crate::disks::Choice {
         device: "sdb".to_owned(),
         identity: "w/s/1".to_owned(),
-        encrypt: true,
     }];
     let listed = arguments(&settings, "disks", &request);
     let at = listed

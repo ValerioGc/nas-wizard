@@ -213,7 +213,6 @@ pub fn config(api: &str, state_dir: &std::path::Path) -> Config {
             .join("../../system/packages/post_wizard/install.sh"),
         binary: PathBuf::from("nas-wizard"),
         disks: false,
-        encryption: false,
         launcher_binary: PathBuf::from("/nonexistent/nas-os-axum"),
     }
 }

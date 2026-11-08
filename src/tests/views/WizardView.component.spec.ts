@@ -23,7 +23,7 @@ function wizard(phase: WizardState['phase']): WizardState {
   };
 }
 
-const noDisks: WizardDisks = { enabled: false, encryption: false, disks: [] };
+const noDisks: WizardDisks = { enabled: false, disks: [] };
 
 function answering(state: WizardState, disks: WizardDisks = noDisks) {
   vi.mocked(request).mockImplementation((path: string) => {
@@ -306,7 +306,6 @@ describe('setup wizard', () => {
   it('offers the empty data disks where the wizard prepares them, and sends the chosen ones', async () => {
     answering(wizard('collecting'), {
       enabled: true,
-      encryption: true,
       disks: [
         { device: 'sdb', size: 2e12, model: 'Data Disk', identity: 'w/s/1', empty: true },
         { device: 'sdc', size: 1e12, model: null, identity: 'w/s/2', empty: false },
@@ -327,19 +326,18 @@ describe('setup wizard', () => {
     expect(step.text()).toContain('Data Disk');
     expect(step.text()).toContain('Contiene già dati');
     expect(wrapper.find('[data-testid="wizard_disk_sdc_keep"]').exists()).toBe(false);
-    await wrapper.get('[data-testid="wizard_disk_sdb_encrypted"]').trigger('click');
+    expect(wrapper.find('[data-testid="wizard_disk_sdb_encrypted"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="wizard_disk_sdb_plain"]').trigger('click');
     expect(step.text()).toContain('cancella tutto');
     await next(wrapper).trigger('click');
     await next(wrapper).trigger('click');
-    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('sdb (cifrato)');
+    expect(wrapper.get('[data-testid="wizard_summary"]').text()).toContain('sdb');
     await wrapper.get('[data-testid="wizard_finish"]').trigger('click');
     await flushPromises();
 
     const sent = vi
       .mocked(request)
       .mock.calls.find(([path]) => path === '/wizard/install')?.[1] as RequestInit;
-    expect(JSON.parse(sent.body as string).disks).toEqual([
-      { device: 'sdb', identity: 'w/s/1', encrypt: true },
-    ]);
+    expect(JSON.parse(sent.body as string).disks).toEqual([{ device: 'sdb', identity: 'w/s/1' }]);
   });
 });

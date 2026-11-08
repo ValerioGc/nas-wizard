@@ -11,19 +11,15 @@ interface Props {
   offer: WizardDisks;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 const plans = defineModel<Record<string, DiskPlan>>({ required: true });
 
-const options = computed(() => [
+const options = [
   { value: 'keep' as const, label: 'disks.options.keep' },
   { value: 'plain' as const, label: 'disks.options.plain' },
-  ...(props.offer.encryption
-    ? [{ value: 'encrypted' as const, label: 'disks.options.encrypted' }]
-    : []),
-]);
+];
 
 const erasing = computed(() => Object.values(plans.value).some((plan) => plan !== 'keep'));
-const encrypting = computed(() => Object.values(plans.value).includes('encrypted'));
 
 function gigabytes(size: number) {
   return `${Math.round(size / 1e9)} GB`;
@@ -58,7 +54,9 @@ function choose(device: string, plan: DiskPlan) {
 
     <!-- Alerts -->
     <AlertBanner v-if="erasing" tone="warning" compact>{{ t('disks.warning') }}</AlertBanner>
-    <AlertBanner v-if="encrypting" tone="info" compact>{{ t('disks.encryptedNote') }}</AlertBanner>
+    <AlertBanner v-if="offer.disks.some((disk) => disk.empty)" tone="info" compact>
+      <span data-testid="wizard_disks_encryption_note">{{ t('disks.encryptionNote') }}</span>
+    </AlertBanner>
   </div>
 </template>
 

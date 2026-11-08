@@ -33,8 +33,6 @@ pub struct Config {
     pub binary: PathBuf,
     /// The step of the data disks is shown, unless `WIZARD_DISKS_MODE=off`
     pub disks: bool,
-    /// Encryption is offered in that step, unless `WIZARD_ENCRYPTION_MODE=off`
-    pub encryption: bool,
     /// The launcher once installed, whose root code prepares the disks
     pub launcher_binary: PathBuf,
 }
@@ -100,7 +98,6 @@ impl Config {
                 .unwrap_or_else(|| post_script(&binary)),
             binary,
             disks: !std::env::var("WIZARD_DISKS_MODE").is_ok_and(|mode| mode == "off"),
-            encryption: !std::env::var("WIZARD_ENCRYPTION_MODE").is_ok_and(|mode| mode == "off"),
             launcher_binary: std::env::var_os("WIZARD_LAUNCHER_BINARY").map_or_else(
                 || PathBuf::from("/usr/local/bin/nas-os-axum"),
                 PathBuf::from,

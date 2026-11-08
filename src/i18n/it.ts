@@ -100,11 +100,10 @@ export default {
     options: {
       keep: 'Lascia così',
       plain: 'Inizializza',
-      encrypted: 'Inizializza cifrato',
     },
     warning: 'Inizializzare un disco cancella tutto il suo contenuto.',
-    encryptedNote:
-      'Un disco cifrato si sblocca da solo all’avvio. Dopo l’accesso imposta una password e una chiave di recupero dall’app Dischi.',
+    encryptionNote:
+      'Il wizard prepara i dischi senza cifratura. Dopo l’accesso puoi cifrare un disco interno dall’app Dischi, che usa una connessione HTTPS, scegliendo la password, la chiave di recupero e lo sblocco automatico all’avvio. La cifratura cancella il contenuto del disco, quindi conviene farla prima di copiarci i dati.',
   },
   token: {
     title: 'Token delle release',
@@ -137,7 +136,6 @@ export default {
     disks: {
       label: 'Dischi da inizializzare',
       none: 'Nessuno',
-      encrypted: 'cifrato',
     },
   },
   install: {

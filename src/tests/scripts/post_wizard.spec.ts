@@ -85,7 +85,7 @@ describe('post_wizard/install.sh', () => {
     expect(none.stdout).toMatch(/@@step disks\n@@detail none\n@@done disks/);
 
     const list = join(temp.path, 'disks.json');
-    writeFileSync(list, '[{"device":"sdb","identity":"x/y/1","encrypt":true}]');
+    writeFileSync(list, '[{"device":"sdb","identity":"x/y/1"}]');
     const simulated = postWizard(['--disks', list, '--simulate']);
     expect(simulated.code).toBe(0);
     expect(simulated.stdout).toMatch(/@@step disks\n@@detail simulated\n@@done disks/);

@@ -5,6 +5,15 @@ All notable changes to the wizard of nas-os are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1]
+
+- Updated WizardDisks interface to remove encryption property.
+- Modified WizardView component to reflect changes in disk handling, removing references to encryption.
+- Adjusted tests in WizardView.component.spec.ts to align with the new disk structure.
+- Updated installation manual to clarify that data disks can be initialized without encryption.
+- Added console tools for NAS management, including scripts for status checks and service restarts.
+- Enhanced uninstall script to ensure console tools are removed properly.
+
 ## [0.9.0]
 
 - First release of the wizard for nas os

@@ -91,13 +91,14 @@ using the token in `WIZARD_TOKEN_PATH`; `nas-wizard complete` completes setup on
 
 The `disks` step always exists but only acts when disks were selected. By default, even without
 system encryption, the wizard offers a Data disks step (`GET /api/wizard/disks`,
-`axum/src/disks.rs`). It lists internal whole disks excluding the system disk, offers to initialize
-empty disks, and can encrypt them with only an automatic key because passwords must not travel
-through the HTTP wizard. Choices are stored in a non-secret `disks.json` in the working directory
-and passed to `post_wizard` with `--disks`. `nas-wizard disks` calls `nas-os-axum --initialize-storage`
-and `nas-os-axum --storage-crypt`, which revalidate each disk and its identity before erasing it.
-Keys are kept in `/run/nas-wizard-disks`. `WIZARD_DISKS_MODE=off` hides the step;
-`WIZARD_ENCRYPTION_MODE=off` disables the encryption offer.
+`axum/src/disks.rs`). It lists internal whole disks excluding the system disk and offers to
+initialize empty disks, always without encryption. The wizard runs on plain HTTP, where no disk
+password may travel, so encryption is set up after the installation in the Disks app over HTTPS,
+with the password, the recovery key and the automatic unlock the person chooses. A note in the step
+says so. Choices are stored in a non-secret `disks.json` in the working directory and passed to
+`post_wizard` with `--disks`. `nas-wizard disks` calls `nas-os-axum --initialize-storage`, which
+revalidates each disk and its identity before erasing it. A choice that still asks for encryption is
+refused as an invalid list. `WIZARD_DISKS_MODE=off` hides the step.
 
 The password stays in memory until account creation, then is cleared. Neither the password nor
 the token appears in public state read by the page or in the journal.
@@ -173,6 +174,17 @@ under `/var/lib/nas-wizard-updates`. Cleanup requires the release package struct
 `packages/uninstall.sh`, `wizard/`), never empties `/usr/local/lib/nas-wizard`, does not run during
 simulation, and cannot fail the installation. The remaining `uninstall.sh` uses the installed
 wizard's `os_configuration` scripts and removes the wizard last.
+
+The entry script, never with `--update`, runs `post_wizard/tools.sh --install` for the person who ran
+it with sudo (`SUDO_USER`, otherwise root). It copies the console tools of `post_wizard/tools/` into
+`~/nas-tools`, a copy of their own that an update of the NAS never touches, and writes the folder
+down in `/var/lib/nas-os-configuration/nas-tools`. The factory reset keeps them, and the removal of
+the NAS (`tools.sh --remove`) takes away only those files. `nas-status.sh` only reads, and reports
+the services, the answers of the launcher and gateway, the network, the base firewall, a pending
+update check and the errors of the log, with `--logs`, `--full` and `--save` for a report file.
+`sudo nas-restart.sh` restarts only the launcher and the gateway (`--apps` the running applications,
+`--firewall` a reload of the base firewall), waits for them to answer, and refuses while an update
+runs unless `--force` is given. Neither touches SSH, the consoles, the network or a unit of Debian.
 
 `md-to-pdf` generates the installation PDF using Chromium: `PUPPETEER_EXECUTABLE_PATH` if set,
 otherwise an installed Brave, Chromium, or Chrome, falling back to Puppeteer's downloaded browser.

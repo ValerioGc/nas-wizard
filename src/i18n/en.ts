@@ -100,11 +100,10 @@ export default {
     options: {
       keep: 'Leave as it is',
       plain: 'Initialize',
-      encrypted: 'Initialize encrypted',
     },
     warning: 'Initializing a disk erases all of its content.',
-    encryptedNote:
-      'An encrypted disk unlocks by itself at startup. After signing in, set a password and a recovery key in the Disks app.',
+    encryptionNote:
+      'The wizard prepares the disks without encryption. After signing in you can encrypt an internal disk in the Disks app, which uses an HTTPS connection, and choose its password, its recovery key and whether it unlocks by itself at startup. Encryption erases the content of the disk, so do it before copying data onto it.',
   },
   token: {
     title: 'Release token',
@@ -137,7 +136,6 @@ export default {
     disks: {
       label: 'Disks to initialize',
       none: 'None',
-      encrypted: 'encrypted',
     },
   },
   install: {

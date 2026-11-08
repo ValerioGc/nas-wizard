@@ -11,6 +11,7 @@ Conflicts=shutdown.target
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/lib/nas-os-configuration/base-firewall.sh
+ExecReload=/usr/local/lib/nas-os-configuration/base-firewall.sh
 ExecStop=/usr/local/lib/nas-os-configuration/base-firewall.sh --remove
 
 [Install]

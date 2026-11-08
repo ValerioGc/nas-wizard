@@ -56,5 +56,5 @@ install -m 0755 "$here/files/base-firewall.sh" "$LOADER"
 install -m 0644 "$here/files/nas-os-base-firewall.service" "$UNIT"
 systemctl daemon-reload
 systemctl enable "$NAME"
-systemctl restart "$NAME"
+systemctl reload-or-restart "$NAME"
 echo 'base firewall loaded and enabled at boot'

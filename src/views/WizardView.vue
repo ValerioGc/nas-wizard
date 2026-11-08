@@ -76,7 +76,7 @@ const wizard = ref<WizardState | null>(null);
 const connected = ref(false);
 const connection = ref<WizardNetworks['connection'] | null>(null);
 const unreachable = ref('');
-const disks = ref<DisksOffer>({ enabled: false, encryption: false, disks: [] });
+const disks = ref<DisksOffer>({ enabled: false, disks: [] });
 const plans = ref<Record<string, DiskPlan>>({});
 
 const steps = computed(() => (disks.value.enabled ? DISK_STEPS : STEPS));
@@ -86,19 +86,11 @@ const step = computed(() => steps.value[position.value] ?? 'welcome');
 const chosen = computed<DiskChoice[]>(() =>
   disks.value.disks
     .filter((disk) => disk.empty && (plans.value[disk.device] ?? 'keep') !== 'keep')
-    .map((disk) => ({
-      device: disk.device,
-      identity: disk.identity,
-      encrypt: plans.value[disk.device] === 'encrypted',
-    })),
+    .map((disk) => ({ device: disk.device, identity: disk.identity })),
 );
 const disksSummary = computed(() =>
   chosen.value.length
-    ? chosen.value
-        .map((disk) =>
-          disk.encrypt ? `${disk.device} (${t('summary.disks.encrypted')})` : disk.device,
-        )
-        .join(', ')
+    ? chosen.value.map((disk) => disk.device).join(', ')
     : t('summary.disks.none'),
 );
 const installing = computed(() => !!wizard.value && wizard.value.phase !== 'collecting');
