@@ -84,7 +84,7 @@ if ((${#missing[@]} == 0)); then
 fi
 printf '   missing: %s\n' "${missing[@]}"
 if $warn_only; then
-  echo '   going on without it: whoever takes the disks of this machine can read the NAS on them.'
+  echo '   going on without it. Whoever takes the disks of this machine can read the NAS on them.'
   echo '   The installation manual explains what this means and how to encrypt the system.'
   exit 3
 fi

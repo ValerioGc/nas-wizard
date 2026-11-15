@@ -56,7 +56,6 @@ const iconLabel = computed(() => t(toneLabels[props.tone]));
     <div class="alert_banner_body">
       <h3 v-if="props.title">{{ props.title }}</h3>
 
-      <!-- Alert Message -->
       <slot></slot>
     </div>
 
@@ -85,11 +84,11 @@ const iconLabel = computed(() => t(toneLabels[props.tone]));
   font-size: $text_label;
   line-height: 1.5;
 
-  &_icon {
+  .alert_banner_icon {
     color: var(--alert-tone);
   }
 
-  &_body {
+  .alert_banner_body {
     flex: 1;
 
     h3 {
@@ -99,7 +98,7 @@ const iconLabel = computed(() => t(toneLabels[props.tone]));
     }
   }
 
-  &_close {
+  .alert_banner_close {
     @extend %icon_button;
   }
 
@@ -108,22 +107,22 @@ const iconLabel = computed(() => t(toneLabels[props.tone]));
     gap: $space_2;
     padding: $space_2 $space_3;
   }
+}
 
-  &.alert_banner_info {
-    --alert-tone: var(--status-info);
-  }
+.alert_banner_info {
+  --alert-tone: var(--status-info);
+}
 
-  &.alert_banner_success {
-    --alert-tone: var(--status-success);
-  }
+.alert_banner_success {
+  --alert-tone: var(--status-success);
+}
 
-  &.alert_banner_warning {
-    --alert-tone: var(--status-warning);
-  }
+.alert_banner_warning {
+  --alert-tone: var(--status-warning);
+}
 
-  &.alert_banner_error {
-    --alert-tone: var(--status-error);
-  }
+.alert_banner_error {
+  --alert-tone: var(--status-error);
 }
 
 </style>

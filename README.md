@@ -17,13 +17,13 @@ using the token provided during setup when required.
      and shares this status with the Disks app. `--development` remains accepted but is no longer
      needed;
    - runs the pre-wizard tasks (`packages/pre_wizard`), including operating-system configuration
-     (`packages/os_configuration`: packages and the base firewall);
+     (`packages/os_configuration`, with packages and the base firewall);
    - asks GitHub, without a token, whether a newer wizard exists. If so, it downloads and verifies
      that release and runs its entry script instead;
    - installs the wizard in `/usr/local/lib/nas-wizard`, starts the `nas-wizard` systemd unit on
      port 80, and follows it until completion. The unit remains installed but disabled after
      handover to the gateway, so the launcher's reset operation can restart it.
-3. Complete setup in the browser: account, NAS name, language, theme, Wi-Fi, optional data-disk
+3. Complete setup in the browser, with account, NAS name, language, theme, Wi-Fi, optional data-disk
    initialization, release token, and summary. The account uses a username and password. Device
    certificates and mTLS are configured later in Security Center after signing in.
 4. The wizard runs `packages/post_wizard` with the supplied token. It downloads and verifies the

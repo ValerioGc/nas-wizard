@@ -1,15 +1,6 @@
-//! The installation once the choices are made. The work is `packages/post_wizard/install.sh`, run
-//! as root. The script downloads the gateway and launcher with the token, installs them, configures the
-//! launcher, creates the account and ends the first configuration. The wizard hands it the choices
-//! (the token and the account on its input, never on its command line), follows the steps it
-//! announces on its output and shows them. Then the handover, which is the server's: see `main`.
-//!
-//! The script calls this program back for what Rust already does well: `nas-wizard fetch`
-//! downloads and checks a release, `nas-wizard complete` waits for the launcher and ends the
-//! configuration on it.
-//!
-//! Without `WIZARD_MODE=real` the script runs with `--simulate`: the releases are still downloaded
-//! and checked, into the state directory, but nothing is installed.
+//! The installation once the choices are made. `packages/post_wizard/install.sh` does the work as
+//! root, with the token and the account on its input, and calls back `nas-wizard fetch` and
+//! `nas-wizard complete`. Without `WIZARD_MODE=real` it runs with `--simulate`.
 
 use crate::{
     account,

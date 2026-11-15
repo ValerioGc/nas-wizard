@@ -195,7 +195,7 @@ case ${1:-} in
     else
       ruleset | nft -f - || fail 'nft refused the ruleset'
     fi
-    printf 'base firewall applied: web allowed to uid %s\n' "$web_uids"
+    printf 'base firewall applied, web allowed to uid %s\n' "$web_uids"
     ;;
   *)
     fail "unknown option: $1"

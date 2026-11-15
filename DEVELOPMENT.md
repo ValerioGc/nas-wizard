@@ -64,7 +64,7 @@ with `cache: reload` and `redirect: error`. A redirect or failed login-page chec
 waiting. Browser cookies and settings are preserved.
 
 State is kept in memory. Restart an interrupted wizard through the entry script. Every step is
-repeatable: installers are idempotent, `nas-os-gateway account create` exits with 3 when an account
+repeatable. Installers are idempotent, `nas-os-gateway account create` exits with 3 when an account
 already exists, and an already configured launcher returns 409. Both cases count as success.
 
 After the browser steps, the wizard runs `system/packages/post_wizard/install.sh` as root. Choices
@@ -139,13 +139,17 @@ restarts an already running watcher after installation so it uses the new binary
 
 ## Rules
 
-Follow the shared UI conventions: Composition API with `<script setup lang="ts">`, no `any`,
+Follow the shared UI conventions, with Composition API and `<script setup lang="ts">`, no `any`,
 `@/` imports, `_` between words in compound names, SCSS tokens instead of literal values, UI text
 through `t`, camelCase translation keys, and no em dashes. Rust tests belong in
 `backend/axum/tests/` and are included with `#[path]`. Ask before adding any dependency.
 
 Shared components (`components/commons`, `AlertBanner`, and styles) are copied from the UI. The
-wizard does not depend on the launcher UI, just as external applications do not.
+wizard does not depend on the launcher UI, just as external applications do not. A `diff` with the
+launcher shows only the intended differences. The keys follow the nested catalog of the wizard,
+`CommonSpinner` has no `huge` size, `CommonPasswordInput` has no hidden username field, and
+`_variables.scss` and `_placeholders.scss` keep only what the wizard uses. Bring a change of the
+launcher over in the same form.
 
 The Italian and English catalogs in `src/i18n/` group texts by the current wizard steps
 (`welcome`, `account`, `appearance`, `network`, `disks`, `token`, `summary`), followed by
@@ -173,7 +177,10 @@ the adjacent `nas-wizard-*-linux-x64.tar.gz` archive and `.sha256`, and newer wi
 under `/var/lib/nas-wizard-updates`. Cleanup requires the release package structure (`install.sh`,
 `packages/uninstall.sh`, `wizard/`), never empties `/usr/local/lib/nas-wizard`, does not run during
 simulation, and cannot fail the installation. The remaining `uninstall.sh` uses the installed
-wizard's `os_configuration` scripts and removes the wizard last.
+wizard's `os_configuration` scripts and removes the wizard last. It runs the removal scripts of the
+launcher and the gateway with `--purge --yes`, and the answer `delete` on their input for an
+installed version older than `--yes`. The base firewall goes only after the launcher, the gateway
+and the screen, so no port of the NAS is ever open without it.
 
 The entry script, never with `--update`, runs `post_wizard/tools.sh --install` for the person who ran
 it with sudo (`SUDO_USER`, otherwise root). It copies the console tools of `post_wizard/tools/` into
@@ -186,7 +193,7 @@ update check and the errors of the log, with `--logs`, `--full` and `--save` for
 `--firewall` a reload of the base firewall), waits for them to answer, and refuses while an update
 runs unless `--force` is given. Neither touches SSH, the consoles, the network or a unit of Debian.
 
-`md-to-pdf` generates the installation PDF using Chromium: `PUPPETEER_EXECUTABLE_PATH` if set,
+`md-to-pdf` generates the installation PDF using Chromium, from `PUPPETEER_EXECUTABLE_PATH` if set,
 otherwise an installed Brave, Chromium, or Chrome, falling back to Puppeteer's downloaded browser.
 Chapters use fenced Bash code blocks, highlighted by `md-to-pdf` without an additional direct
 syntax-highlighter import.

@@ -282,7 +282,7 @@ describe('post_wizard/clean-package.sh', () => {
     expect(statSync(join(nas.folder, 'uninstall.sh')).mode & 0o777).toBe(0o755);
     expect(readdirSync(nas.parent).sort()).toEqual(['nas-wizard', 'notes.txt']);
     expect(existsSync(nas.updates)).toBe(false);
-    expect(stdout).toContain(`package emptied: ${nas.folder} keeps only uninstall.sh`);
+    expect(stdout).toContain(`package emptied, ${nas.folder} keeps only uninstall.sh`);
   });
 
   it('never empties the installed wizard, nor a folder that is not an unpacked package', () => {

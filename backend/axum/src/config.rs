@@ -1,11 +1,6 @@
-//! What the wizard reads from its environment, once, at the start.
-//!
-//! On the NAS the entry script starts it as the unit `nas-wizard` with `WIZARD_MODE=real`, port 80
-//! and the state directory of the unit. In development every switch is off, the wizard downloads
-//! the releases, but installs nothing and changes no network.
-//!
-//! The token is not here: the user gives it in the page, and it travels from there to the script
-//! that runs after the wizard, on its input.
+//! What the wizard reads from its environment, once, at the start. On the NAS it runs with
+//! `WIZARD_MODE=real` and port 80, in development every switch is off. The token is never here,
+//! it travels from the page to the script on its input.
 
 use std::path::{Path, PathBuf};
 

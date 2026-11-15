@@ -213,16 +213,13 @@ onMounted(load);
 <template>
   <main class="app_surface wizard_page" data-testid="wizard_page">
     <WizardStep :title="title" :description="description" :logo="!installing && step === 'welcome'">
-      <!-- Loading state -->
       <template v-if="!wizard">
         <AlertBanner v-if="unreachable" tone="error" compact>{{ unreachable }}</AlertBanner>
         <CommonSpinner v-else :label="t('common.configurationLoading')" centered />
       </template>
 
-      <!-- Installing state -->
       <WizardInstall v-else-if="installing" :initial="wizard" />
 
-      <!-- Wizard steps -->
       <template v-else>
         <WizardProgress v-if="position > 0" :current="position" :total="steps.length - 1" />
 

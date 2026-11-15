@@ -52,7 +52,6 @@ function choose(device: string, plan: DiskPlan) {
       <p v-else class="muted">{{ t('disks.inUse') }}</p>
     </div>
 
-    <!-- Alerts -->
     <AlertBanner v-if="erasing" tone="warning" compact>{{ t('disks.warning') }}</AlertBanner>
     <AlertBanner v-if="offer.disks.some((disk) => disk.empty)" tone="info" compact>
       <span data-testid="wizard_disks_encryption_note">{{ t('disks.encryptionNote') }}</span>

@@ -1,16 +1,6 @@
-//! The screen of the NAS, the interface on a monitor connected to it, and only while one is.
-//!
-//! `nas-wizard screen` runs as root from `nas-os-screen.service`, a few megabytes for as long as
-//! the machine is on. It watches the video outputs and the keyboards and mice. A monitor connected
-//! starts `nas-os-screen-browser.service`, the browser on the monitor (`cog`, a few hundred
-//! megabytes). A monitor unplugged stops it. So do the minutes without a key or the mouse that the
-//! power settings name, after which the screen goes dark and the monitor into standby. The browser
-//! keeps nothing between two starts: a key or the mouse brings it back on the sign-in page.
-//!
-//! The browser draws on tty1 and holds the screen while it runs, so it runs only while tty1 is the
-//! console in front: Ctrl+Alt+F2 (to F6) stops it and leaves the screen to the text console of
-//! that terminal, Ctrl+Alt+F1 brings the interface back. The kernel switches the console on its
-//! own, since the browser leaves the keyboard to it.
+//! The interface on a monitor connected to the NAS, only while one is. `nas-wizard screen` watches
+//! outputs and input, starts and stops the browser on tty1 and leaves the screen to the text
+//! console on Ctrl+Alt+F2. DEVELOPMENT.md describes the cycle.
 
 use std::{
     collections::HashSet,

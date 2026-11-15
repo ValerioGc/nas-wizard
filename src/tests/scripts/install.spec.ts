@@ -127,7 +127,7 @@ describe('install.sh', () => {
 
     expect(code).toBe(0);
     expect(stdout).toContain('system packages already installed');
-    expect(stdout).toContain('no search for a newer one: the launcher chose this wizard');
+    expect(stdout).toContain('no search for a newer one, the launcher chose this wizard');
     expect(stdout).not.toContain('self-update --into');
     expect(stdout).toContain('Environment="NAS_WIZARD_PACKAGE=/usr/local/lib/nas-wizard"');
 

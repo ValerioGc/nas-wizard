@@ -131,7 +131,6 @@ watch(
 
 <template>
   <div ref="root" class="wizard_install" data-testid="wizard_install">
-    <!-- Installation steps -->
     <ul class="app_list">
       <li
         v-for="step in visibleSteps"
@@ -157,7 +156,6 @@ watch(
       </li>
     </ul>
 
-    <!-- Wizard certificate step -->
     <WizardCertificate v-if="state.phase === 'ready'" @finished="state = $event" />
 
     <p

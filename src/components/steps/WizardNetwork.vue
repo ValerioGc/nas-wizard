@@ -89,7 +89,6 @@ onMounted(scan);
 <template>
   <div class="wizard_network">
     <div class="wizard_network_current">
-      <!-- Current network -->
       <template v-if="state?.connection.connected">
         <CommonIcon :src="state.connection.kind === 'wifi' ? wifiIcon : lanIcon" />
         <span data-testid="wizard_network_current">
@@ -122,7 +121,6 @@ onMounted(scan);
 
     <p v-else-if="error" role="alert" class="app_error">{{ error }}</p>
 
-    <!-- Wi-Fi networks -->
     <template v-if="!scanning && !wired">
       <p v-if="state && !state.canConnect" class="muted">{{ t('network.fixed') }}</p>
       <p

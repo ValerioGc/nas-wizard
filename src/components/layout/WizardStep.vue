@@ -25,12 +25,10 @@ const props = withDefaults(defineProps<Props>(), { description: undefined, logo:
       <p v-if="props.description" class="muted">{{ props.description }}</p>
     </header>
 
-    <!-- Slot for the main content -->
     <div class="wizard_body">
       <slot></slot>
     </div>
 
-    <!-- Slot for the actions -->
     <footer v-if="$slots.actions" class="app_toolbar wizard_actions">
       <slot name="actions"></slot>
     </footer>

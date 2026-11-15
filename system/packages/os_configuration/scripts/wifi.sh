@@ -26,7 +26,7 @@ case ${1:-} in
     exit 0
     ;;
   --remove)
-    [[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root: sudo $0"
+    [[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root, with sudo $0"
     load=$(systemctl show "$NAME" --property=LoadState --value)
     if [[ $load != not-found ]]; then systemctl disable --now "$NAME"; fi
     rm -f -- "$UNIT" "$RULE" "$CHECK"
@@ -41,7 +41,7 @@ case ${1:-} in
   *) fail "unknown option: $1" ;;
 esac
 
-[[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root: sudo $0"
+[[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root, with sudo $0"
 
 install -d -m 0755 "$(dirname "$CHECK")" "$(dirname "$UNIT")" "$(dirname "$RULE")"
 install -m 0755 "$here/files/wifi.sh" "$CHECK"
@@ -51,4 +51,4 @@ systemctl daemon-reload
 udevadm control --reload >/dev/null 2>&1 || true
 systemctl enable "$NAME"
 systemctl restart "$NAME"
-echo 'wireless check installed: wpa_supplicant runs only with a wireless card'
+echo 'wireless check installed, wpa_supplicant runs only with a wireless card'

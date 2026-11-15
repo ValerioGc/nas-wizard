@@ -19,7 +19,6 @@ const shown = (field: keyof typeof touched) => (touched[field] ? errors.value[fi
 
 <template>
   <div class="wizard_fields">
-    <!-- Username Field -->
     <CommonField :error="shown('username')">
       <label for="wizard_username">{{ t('account.fields.username') }}</label>
       <input
@@ -34,7 +33,6 @@ const shown = (field: keyof typeof touched) => (touched[field] ? errors.value[fi
       />
     </CommonField>
 
-    <!-- Password Field -->
     <CommonField :error="shown('password')">
       <label for="wizard_password">{{ t('account.fields.password') }}</label>
       <CommonPasswordInput
@@ -48,7 +46,6 @@ const shown = (field: keyof typeof touched) => (touched[field] ? errors.value[fi
       />
     </CommonField>
 
-    <!-- Confirm Password Field -->
     <CommonField :error="shown('confirm')">
       <label for="wizard_confirm">{{ t('account.fields.confirmPassword') }}</label>
       <CommonPasswordInput

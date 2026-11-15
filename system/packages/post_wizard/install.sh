@@ -65,7 +65,7 @@ done
 if [[ -n $from ]]; then
   [[ " ${STEPS[*]} " == *" $from "* ]] || fail "not a step: $from"
 fi
-$simulate || [[ $EUID -eq 0 ]] || fail "it has to run as root: the wizard runs it"
+$simulate || [[ $EUID -eq 0 ]] || fail "it has to run as root, the wizard runs it"
 
 token='' account='' password=''
 IFS= read -r token || true

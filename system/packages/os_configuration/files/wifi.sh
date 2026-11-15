@@ -18,9 +18,9 @@ cards=("$NET"/*/wireless "$NET"/*/phy80211)
 if ((${#cards[@]} > 0)); then
   systemctl unmask --runtime "$UNIT"
   systemctl start --no-block "$UNIT" || true
-  echo "a wireless card is there: $UNIT available"
+  echo "a wireless card is there, $UNIT available"
 else
   systemctl mask --runtime "$UNIT"
   systemctl stop --no-block "$UNIT" || true
-  echo "no wireless card: $UNIT off until one appears"
+  echo "no wireless card, $UNIT off until one appears"
 fi

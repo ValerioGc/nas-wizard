@@ -1,27 +1,17 @@
 #!/usr/bin/env bash
 #
-# The entry of the NAS. Run once, as root, from the unpacked package of the wizard on a Debian 13
-# just installed. Everything else happens from the browser.
+# The entry of the NAS, run once as root from the unpacked package on a fresh Debian 13. It checks
+# the machine, configures the system, installs the wizard as the unit nas-wizard on port 80 and
+# follows it until the gateway takes over. Everything else happens in the browser, and README.md
+# lists the steps.
 #
 #   sudo ./install.sh
 #   ./install.sh --dry-run        # prints what it would do, without doing it
 #   sudo ./install.sh --update    # the update of a configured NAS, run by the launcher
 #
-# It checks the machine (Debian 13, then the system on LUKS and a TPM 2.0, which only
-# warns. Then it installs the wizard on the machine (/usr/local/lib/nas-wizard, with
-# what runs after it and the configuration of the system) and starts it as the unit nas-wizard on port 80, so a closed SSH session or a
-# reboot does not stop it, and follows it until it hands the NAS over to the gateway. The unit
-# stays, disabled, once the NAS is configured, the factory reset of the launcher starts it again.
-# At its end the wizard empties this folder but for uninstall.sh, and puts the manuals in the home
-# of the user it creates. The console tools (packages/post_wizard/tools) go to ~/nas-tools of the
-# person who ran this script with sudo, never with --update.
-# The token of the private releases is given in the wizard, which runs what comes
-# after it (packages/post_wizard) with that token.
-#
-# With --update the NAS is already configured, the launcher runs it from a newer package, when it
-# updates the NAS or before its factory reset. It configures the operating system again, which is
-# idempotent and brings the changes of the release (the firewall, for one), and puts the new wizard
-# in place.
+# With --update the launcher runs it from a newer package, when it updates the NAS or before a
+# factory reset, to apply the configuration of the system again and put the new wizard in place.
+# The console tools go to ~/nas-tools of whoever ran it with sudo, never with --update.
 
 set -euo pipefail
 
@@ -58,8 +48,8 @@ for option in "$@"; do
   esac
 done
 
-$dry_run || [[ $EUID -eq 0 ]] || fail "it has to run as root: sudo $0"
-[[ -x $WIZARD ]] || $dry_run || fail "$WIZARD is missing: run this script from the unpacked package"
+$dry_run || [[ $EUID -eq 0 ]] || fail "it has to run as root, with sudo $0"
+[[ -x $WIZARD ]] || $dry_run || fail "$WIZARD is missing, run this script from the unpacked package"
 command -v systemctl >/dev/null || fail 'systemd is not available on this machine'
 version=$(. "$OS_RELEASE" 2>/dev/null && printf '%s %s' "${ID:-}" "${VERSION_ID:-}") || version=''
 [[ $version == 'debian 13' ]] || fail "this NAS runs on Debian 13, not on '${version:-an unknown system}'"
@@ -83,7 +73,7 @@ fi
 
 say "Version of the wizard"
 if $update; then
-  echo "   no search for a newer one: the launcher chose this wizard"
+  echo "   no search for a newer one, the launcher chose this wizard"
 elif $dry_run; then
   echo "   [dry run] $WIZARD self-update --into $UPDATES"
 elif [[ -n ${NAS_WIZARD_UPDATED:-} ]]; then
@@ -95,7 +85,7 @@ else
   set -e
   case $outcome in
     0)
-      echo "   a newer wizard is out: running $newer/install.sh"
+      echo "   a newer wizard is out, running $newer/install.sh"
       exec env NAS_WIZARD_UPDATED=1 NAS_WIZARD_ORIGIN="$here" bash "$newer/install.sh" "$@"
       ;;
     3) echo "   $("$WIZARD" --version) is the latest" ;;

@@ -24,7 +24,7 @@ case ${1:-} in
     exit 0
     ;;
   --remove)
-    [[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root: sudo $0"
+    [[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root, with sudo $0"
     if command -v nft >/dev/null; then
       tables=$(nft list tables) || fail 'cannot inspect nftables rules'
       for table in nas_launcher nas_base; do
@@ -33,7 +33,7 @@ case ${1:-} in
         fi
       done
     elif [[ -e $UNIT || -e $LOADER ]]; then
-      fail 'nft is missing: removal of the installed NAS firewall cannot be verified'
+      fail 'nft is missing, so the removal of the installed NAS firewall cannot be verified'
     fi
     load=$(systemctl show "$NAME" --property=LoadState --value)
     if [[ $load != not-found ]]; then
@@ -46,10 +46,10 @@ case ${1:-} in
     exit 0
     ;;
   '') ;;
-  *) fail "unknown option: $1" ;;
+  *) fail "unknown option $1" ;;
 esac
 
-[[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root: sudo $0"
+[[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root, with sudo $0"
 
 install -d -m 0755 "$(dirname "$LOADER")" "$(dirname "$UNIT")"
 install -m 0755 "$here/files/base-firewall.sh" "$LOADER"

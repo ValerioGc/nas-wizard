@@ -630,11 +630,11 @@ describe('uninstall.sh', () => {
   it('undoes what the wizard did in the reverse order it did it', () => {
     const script = readFileSync(join(OS_CONFIGURATION, '..', 'uninstall.sh'), 'utf8');
     const order = [
-      '$configuration/scripts/firewall.sh" --remove',
       'rm -f /etc/credstore.encrypted/nas-os.launcher-token',
       '$LAUNCHER_TOOLS/uninstall.sh" --purge',
       '$GATEWAY_TOOLS/uninstall.sh" --purge',
       '$configuration/scripts/screen.sh" --remove',
+      '$configuration/scripts/firewall.sh" --remove',
       '$configuration/scripts/wifi.sh" --remove',
       'post_wizard/tools.sh" --remove',
       '$configuration/scripts/uninstall.sh"\n',
@@ -643,6 +643,28 @@ describe('uninstall.sh', () => {
 
     expect(order.every((position) => position > 0)).toBe(true);
     expect(order).toEqual([...order].sort((left, right) => left - right));
+  });
+
+  it('removes the base firewall only once nothing of the NAS listens any more', () => {
+    const script = readFileSync(join(OS_CONFIGURATION, '..', 'uninstall.sh'), 'utf8');
+    const firewall = script.indexOf('say "Base firewall"');
+
+    for (const step of [
+      'say "Stop NAS services"',
+      'say "Launcher"',
+      'say "Gateway"',
+      'say "Screen"',
+    ]) {
+      expect(script.indexOf(step), step).toBeGreaterThan(0);
+      expect(script.indexOf(step), step).toBeLessThan(firewall);
+    }
+  });
+
+  it('confirms the removal of launcher and gateway data for them, also for an older version', () => {
+    const script = readFileSync(join(OS_CONFIGURATION, '..', 'uninstall.sh'), 'utf8');
+
+    expect(script).toContain(`"$LAUNCHER_TOOLS/uninstall.sh" --purge --yes <<<'delete'`);
+    expect(script).toContain(`"$GATEWAY_TOOLS/uninstall.sh" --purge --yes <<<'delete'`);
   });
 
   it('waits for an update and its check, and goes on when the terminal goes away', () => {

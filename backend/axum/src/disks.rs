@@ -1,12 +1,6 @@
-//! The data disks of the first configuration.
-//! The empty whole internal disks the person may have initialized, read from lsblk.
-//! The wizard only proposes them. Once the launcher is installed,
-//! `nas-wizard disks` hands each choice to its root code (`nas-os-axum --initialize-storage`),
-//! which checks the disk again, its identity included, before it erases anything.
-//!
-//! The step is on by default and `WIZARD_DISKS_MODE=off` hides it. The wizard never encrypts a
-//! disk. It runs on plain HTTP, where no password of a disk may travel, so the person encrypts a
-//! data disk later in the app Dischi, over HTTPS, with the keys they choose.
+//! The data disks of the first configuration, the empty internal disks read from lsblk. The wizard
+//! only proposes them and never encrypts one. `nas-wizard disks` hands each choice to the root code
+//! of the launcher, which checks the disk again before it erases it.
 
 use crate::config::Config;
 use serde::{Deserialize, Serialize};

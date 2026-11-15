@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Saves the state from before the NAS and restores only the configuration the NAS changes.
-# --restore keeps the packages the wizard needs. Without options it also removes those it added,
-# but never one a package that was already there has come to depend on, through an upgrade.
-# The first copy stays protected in /var/lib/nas-os-configuration/original and is never replaced.
-# --snapshot comes before any change --check refuses a restore without a valid copy.
+#
+# Saves the state of the machine from before the NAS and puts back only what the NAS changes. The
+# first copy stays protected in /var/lib/nas-os-configuration/original and is never replaced, and
+# every restoring option refuses to run without it.
+#
+#   sudo scripts/uninstall.sh --snapshot      # before any change, once
+#   sudo scripts/uninstall.sh --check         # the copy is there and valid
+#   sudo scripts/uninstall.sh --restore       # the configuration, keeping the packages
+#   sudo scripts/uninstall.sh                 # also the packages the NAS added, never one that
+#                                             # a package already there now depends on
+# The removal of the launcher and the reset use the other options (--remove-terminal-user,
+# --remove-app-packages, --restore-hostname, --user-existed, --group-existed, --record-packages).
 
 set -euo pipefail
 
@@ -275,12 +282,12 @@ case ${1:-} in
     exit 0 ;;
   --dry-run) echo '[dry run] restore original system configuration and remove recorded NAS packages'; exit 0 ;;
   --restore|'') ;;
-  *) fail "unknown option: $1" ;;
+  *) fail "unknown option $1" ;;
 esac
 check_snapshot
 if [[ ${NAS_RESTORE_RECOVERY:-} != 1 ]]; then
   # A failed purge must still leave the previous network restored.
-  trap 'status=$?; if ((status != 0)); then NAS_RESTORE_RECOVERY=1 bash "$0" --restore || printf "error: recovery failed; original system backup retained in %s\n" "$ORIGINAL" >&2; fi' EXIT
+  trap 'status=$?; if ((status != 0)); then NAS_RESTORE_RECOVERY=1 bash "$0" --restore || printf "error: recovery failed, the original system backup stays in %s\n" "$ORIGINAL" >&2; fi' EXIT
 fi
 printf '   stopping the services of the NAS (the network keeps running)\n'
 stop_services

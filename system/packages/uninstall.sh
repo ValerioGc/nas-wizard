@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 #
-# Takes the machine back to where it was before nas-os: the inverse, in reverse order, of what the
-# wizard did. It removes the token of the private releases, the launcher and the gateway with their
-# units, permissions and data, through the removal scripts their installations left on the machine,
-# then the base firewall and the Debian packages the OS configuration installed, only those, not
-# the ones that were already there, and last the wizard installed on the machine.
-#
-# It is the only file the wizard leaves in the unpacked package once the NAS is configured, then it
-# takes the configuration of the system from the installed wizard, which it removes after it.
+# Takes the machine back to where it was before nas-os, undoing what the wizard did in reverse
+# order. The launcher and the gateway go with their data, through the removal scripts their
+# installations left, then the screen, the base firewall once nothing of the NAS listens any more,
+# the Debian packages the OS configuration added and last the installed wizard. Left alone in the
+# emptied package, it takes the configuration of the system from the installed wizard.
 #
 #   sudo ./uninstall.sh          # asks to type 'delete' first
 #   sudo ./uninstall.sh --yes    # without asking
@@ -41,11 +38,11 @@ confirmed=false
 case ${1:-} in
   --yes) confirmed=true ;;
   '') ;;
-  *) fail "unknown option: $1" ;;
+  *) fail "unknown option $1" ;;
 esac
 
-[[ $EUID -eq 0 ]] || fail "it has to run as root: sudo $0"
-[[ -d $configuration ]] || fail "the configuration of the system is missing: $configuration"
+[[ $EUID -eq 0 ]] || fail "it has to run as root, with sudo $0"
+[[ -d $configuration ]] || fail "the configuration of the system is missing from $configuration"
 "$configuration/scripts/uninstall.sh" --check
 
 if ! $confirmed; then
@@ -69,9 +66,10 @@ TEXT
     fi
   fi
   read -r -p "Type 'delete' to confirm: " answer
-  [[ $answer == delete ]] || fail 'cancelled: nothing was removed'
+  [[ $answer == delete ]] || fail 'cancelled, nothing was removed'
 fi
 
+# Keep in step with factory-reset.sh and reset.rs in the launcher.
 busy=$(systemctl list-units --plain --no-legend --state=active,activating,deactivating,reloading \
   'nas-os-reset.service' 'nas-os-update.service' 'nas-os-update-verify.service' 'nas-os-apt@*.service' 'nas-os-app-packages@*.service' \
   'nas-os-storage-initialize.service' 'nas-os-storage-rename.service' 'nas-os-storage-eject.service' \
@@ -116,29 +114,31 @@ for unit in nas-os-firewall.service nas-os-smb-shares.service nas-os-sync-ports.
   if [[ $load != not-found ]]; then systemctl stop "$unit"; fi
 done
 
-say "Base firewall"
-"$configuration/scripts/firewall.sh" --remove
-
 say "Token"
 rm -f /etc/credstore.encrypted/nas-os.launcher-token
 rmdir /etc/credstore.encrypted 2>/dev/null || true
 
+# The answer on the input is for an installed launcher or gateway older than --yes.
 say "Launcher"
 if [[ -x $LAUNCHER_TOOLS/uninstall.sh ]]; then
-  "$LAUNCHER_TOOLS/uninstall.sh" --purge <<<'delete'
+  "$LAUNCHER_TOOLS/uninstall.sh" --purge --yes <<<'delete'
 else
   echo "   not installed"
 fi
 
 say "Gateway"
 if [[ -x $GATEWAY_TOOLS/uninstall.sh ]]; then
-  "$GATEWAY_TOOLS/uninstall.sh" --purge <<<'delete'
+  "$GATEWAY_TOOLS/uninstall.sh" --purge --yes <<<'delete'
 else
   echo "   not installed"
 fi
 
 say "Screen"
 "$configuration/scripts/screen.sh" --remove
+
+# Last of what can listen on the network, so no port of the NAS is ever open without it.
+say "Base firewall"
+"$configuration/scripts/firewall.sh" --remove
 
 say "Wireless check"
 "$configuration/scripts/wifi.sh" --remove

@@ -44,7 +44,7 @@ case ${1:-} in
   *) fail "unknown option: $1" ;;
 esac
 
-$dry_run || [[ $EUID -eq 0 || -n ${NAS_CONFIGURATION_STATE:-} ]] || fail "it has to run as root: sudo $0"
+$dry_run || [[ $EUID -eq 0 || -n ${NAS_CONFIGURATION_STATE:-} ]] || fail "it has to run as root, with sudo $0"
 
 installed() {
   dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'install ok installed'

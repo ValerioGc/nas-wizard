@@ -1,16 +1,5 @@
-//! `nas-wizard` serves the wizard. The other commands are for the scripts around it:
-//!
-//! - `self-update --into <dir>`, for the entry script: a newer wizard, unpacked in a directory of
-//!   its own printed on the output (0), this one is the latest (3), or it could not tell (1);
-//! - `fetch <gateway|ui> --into <dir>`, for the script after the wizard: the latest release,
-//!   checked and unpacked, with the token in `WIZARD_TOKEN_PATH`; its version on the output;
-//! - `complete --language <it|en> --theme <system|light|dark> --name <name>`, for the same
-//!   script: the end of the first configuration on the launcher; a detail for the step on the
-//!   output;
-//! - `disks <file>`, for the same script: the empty data disks chosen in the page, prepared by the
-//!   root code of the launcher just installed; a detail for each disk on the output;
-//! - `screen`, for `nas-os-screen.service`: the interface on a monitor connected to the NAS, while
-//!   one is (see `screen`).
+//! `nas-wizard` serves the wizard. Its other commands (`self-update`, `fetch`, `complete`, `disks`,
+//! `screen`) serve the scripts around it, as the table in DEVELOPMENT.md lists.
 
 use nas_wizard_axum::{
     config::Config,

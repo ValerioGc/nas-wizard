@@ -53,7 +53,7 @@ dry_run=false
 case ${1:-} in
   --dry-run) dry_run=true ;;
   --remove)
-    [[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root: sudo $0"
+    [[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root, with sudo $0"
     remove
     exit 0
     ;;
@@ -65,7 +65,7 @@ shopt -s nullglob
 cards=("$OUTPUTS"/card[0-9])
 shopt -u nullglob
 if ((${#cards[@]} == 0)); then
-  echo 'no video output on this machine: no screen'
+  echo 'no video output on this machine, so no screen'
   exit 0
 fi
 
@@ -81,7 +81,7 @@ if $dry_run; then
   exit 0
 fi
 
-[[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root: sudo $0"
+[[ $EUID -eq 0 || -n $ROOT ]] || fail "it has to run as root, with sudo $0"
 
 if ((${#missing[@]} > 0)); then
   export DEBIAN_FRONTEND=noninteractive
@@ -116,4 +116,4 @@ install -m 0644 "$here/files/screen/$WATCHER" "$UNITS/$WATCHER"
 install -m 0644 "$here/files/screen/$BROWSER" "$UNITS/$BROWSER"
 install -m 0644 "$here/files/screen/nas-os-screen.pam" "$PAM"
 systemctl daemon-reload
-echo "screen installed and off: sudo systemctl enable --now $WATCHER turns it on"
+echo "screen installed and off, sudo systemctl enable --now $WATCHER turns it on"
