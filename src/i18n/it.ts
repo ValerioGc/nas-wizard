@@ -96,7 +96,12 @@ export default {
     intro:
       'Dischi vuoti da preparare per i dati. I dischi con dati restano come sono e compaiono nell’app File. Il passaggio è facoltativo.',
     none: 'Nessun disco dati vuoto collegato.',
-    inUse: 'Contiene già dati e resta com’è',
+    state: {
+      inUse: 'In uso',
+      empty: 'Vuoto',
+      erasing: 'Da inizializzare',
+    },
+    inUseHint: 'Il disco contiene dati e non viene modificato.',
     options: {
       keep: 'Lascia così',
       plain: 'Inizializza',

@@ -96,7 +96,12 @@ export default {
     intro:
       'Empty disks to prepare for data. Disks with data stay as they are and appear in Files. This step is optional.',
     none: 'No empty data disk is connected.',
-    inUse: 'Already holds data and stays as it is',
+    state: {
+      inUse: 'In use',
+      empty: 'Empty',
+      erasing: 'To initialize',
+    },
+    inUseHint: 'The disk holds data and is left untouched.',
     options: {
       keep: 'Leave as it is',
       plain: 'Initialize',

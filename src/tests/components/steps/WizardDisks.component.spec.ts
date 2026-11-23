@@ -31,13 +31,16 @@ describe('WizardDisks', () => {
     wrapper = disks();
 
     expect(wrapper.text()).toContain('/dev/sdb');
-    expect(wrapper.text()).toContain('2000 GB');
-    expect(wrapper.text()).toContain('Already holds data');
+    expect(wrapper.text()).toContain('2 TB');
+    expect(wrapper.text()).toContain('1 TB');
+    expect(wrapper.get('[data-testid="wizard_disk_sdc_state"]').text()).toContain('In use');
+    expect(wrapper.get('[data-testid="wizard_disk_sdb_state"]').text()).toContain('Empty');
     expect(wrapper.find('[data-testid="wizard_disk_sdb_encrypted"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="wizard_disk_sdc_keep"]').exists()).toBe(false);
 
     await wrapper.get('[data-testid="wizard_disk_sdb_plain"]').trigger('click');
     expect(wrapper.props('modelValue')).toEqual({ sdb: 'plain' });
+    expect(wrapper.get('[data-testid="wizard_disk_sdb_state"]').text()).toContain('To initialize');
     expect(wrapper.text()).toContain('erases all of its content');
   });
 

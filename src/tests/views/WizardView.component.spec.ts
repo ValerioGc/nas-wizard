@@ -324,7 +324,7 @@ describe('setup wizard', () => {
     const step = wrapper.get('[data-testid="wizard_disks"]');
     expect(step.text()).toContain('/dev/sdb');
     expect(step.text()).toContain('Data Disk');
-    expect(step.text()).toContain('Contiene già dati');
+    expect(wrapper.get('[data-testid="wizard_disk_sdc_state"]').text()).toContain('In uso');
     expect(wrapper.find('[data-testid="wizard_disk_sdc_keep"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="wizard_disk_sdb_encrypted"]').exists()).toBe(false);
     await wrapper.get('[data-testid="wizard_disk_sdb_plain"]').trigger('click');
